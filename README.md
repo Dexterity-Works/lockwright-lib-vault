@@ -38,7 +38,7 @@ No client, no vault operations.
 ## Install
 
 ```bash
-pnpm add git+https://github.com/Thaoh/lockwright-lib-vault.git
+pnpm add git+https://github.com/Dexterity-Works/lockwright-lib-vault.git
 ```
 
 Imports stay `@tetherto/pearpass-lib-vault`. That npm name is not this fork if you install it from the npm registry.
@@ -230,11 +230,11 @@ EventEmitter surface (Node `events` convention):
 
 ## Related Projects
 
-- [lockwright-app-mobile](https://github.com/Thaoh/lockwright-app-mobile)
-- [lockwright-app-desktop](https://github.com/Thaoh/lockwright-app-desktop)
-- [lockwright-app-browser-extension](https://github.com/Thaoh/lockwright-app-browser-extension)
-- [lockwright-lib-vault-core](https://github.com/Thaoh/lockwright-lib-vault-core)
-- [lockwright-lib-constants](https://github.com/Thaoh/lockwright-lib-constants)
+- [lockwright-app-mobile](https://github.com/Dexterity-Works/lockwright-app-mobile)
+- [lockwright-app-desktop](https://github.com/Dexterity-Works/lockwright-app-desktop)
+- [lockwright-app-browser-extension](https://github.com/Dexterity-Works/lockwright-app-browser-extension)
+- [lockwright-lib-vault-core](https://github.com/Dexterity-Works/lockwright-lib-vault-core)
+- [lockwright-lib-constants](https://github.com/Dexterity-Works/lockwright-lib-constants)
 
 ## Contributing
 
