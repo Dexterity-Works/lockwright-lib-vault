@@ -41,20 +41,20 @@ No client, no vault operations.
 pnpm add git+https://github.com/Dexterity-Works/lockwright-lib-vault.git
 ```
 
-Imports stay `@tetherto/pearpass-lib-vault`. That npm name is not this fork if you install it from the npm registry.
+The package name is `lockwright-lib-vault`.
 
 ## Usage Examples
 
 ### Initializing the Library
 
 ```javascript
-import { setPearpassVaultClient } from '@tetherto/pearpass-lib-vault';
+import { setPearpassVaultClient } from 'lockwright-lib-vault';
 
 // Set up the vault client with your implementation
 // Choose one of the client implementations:
-import { createPearpassVaultClient } from '@tetherto/pearpass-lib-vault-bare';
+import { createPearpassVaultClient } from 'lockwright-lib-vault-bare';
 // OR
-import { createPearpassVaultClient } from '@tetherto/pearpass-lib-vault-desktop'
+import { createPearpassVaultClient } from 'lockwright-lib-vault-desktop'
 
 // Initialize the appropriate client
 const  vaultClient  = createPearpassVaultClient();
@@ -66,7 +66,7 @@ setPearpassVaultClient(vaultClient);
 ### Creating a Master Password
 
 ```javascript
-import { createMasterPassword } from '@tetherto/pearpass-lib-vault';
+import { createMasterPassword } from 'lockwright-lib-vault';
 
 // Create a master password to secure all vaults
 const encryptionData = await createMasterPassword('your-secure-password');
@@ -76,7 +76,7 @@ const encryptionData = await createMasterPassword('your-secure-password');
 
 ```jsx
 import React from 'react';
-import { useVaults } from '@tetherto/pearpass-lib-vault';
+import { useVaults } from 'lockwright-lib-vault';
 
 function VaultManager() {
   const { 
@@ -97,7 +97,7 @@ function VaultManager() {
 
 ```jsx
 import React from 'react';
-import { useCreateFolder, useFolders } from '@tetherto/pearpass-lib-vault';
+import { useCreateFolder, useFolders } from 'lockwright-lib-vault';
 
 function FolderManager() {
   const { data: folders, isLoading } = useFolders({
@@ -121,7 +121,7 @@ function FolderManager() {
 
 ```jsx
 import React, { useState } from 'react';
-import { useCreateRecord, useRecords, useUpdateRecord } from '@tetherto/pearpass-lib-vault';
+import { useCreateRecord, useRecords, useUpdateRecord } from 'lockwright-lib-vault';
 
 function RecordManager({ vaultId }) {
   const [selectedRecord, setSelectedRecord] = useState(null);

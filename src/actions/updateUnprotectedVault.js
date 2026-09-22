@@ -1,5 +1,5 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
-import { Validator } from '@tetherto/pear-apps-utils-validator'
+import { Validator } from 'lockwright-utils-validator'
 
 import { getVaultByIdAndClose } from '../api/getVaultByIdAndClose'
 import { updateUnprotectedVault as updateUnprotectedVaultApi } from '../api/updateUnprotectedVault'

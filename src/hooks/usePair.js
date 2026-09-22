@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { MS_PER_SECOND } from '@tetherto/pearpass-lib-constants'
+import { MS_PER_SECOND } from 'lockwright-lib-constants'
 import { useDispatch } from 'react-redux'
 
 import { getVaultById } from '../actions/getVaultById'

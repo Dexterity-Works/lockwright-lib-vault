@@ -1,4 +1,4 @@
-import { generateUniqueId } from '@tetherto/pear-apps-utils-generate-unique-id'
+import { generateUniqueId } from 'lockwright-utils-generate-unique-id'
 
 import { ACTION_TYPES } from '../actions'
 import { pearpassVaultClient } from '../instances'

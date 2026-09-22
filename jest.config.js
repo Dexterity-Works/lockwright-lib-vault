@@ -12,13 +12,13 @@ export default {
     customExportConditions: ['node', 'node-addons']
   },
   moduleNameMapper: {
-    '^@tetherto/pear-apps-utils-generate-unique-id$':
+    '^lockwright-utils-generate-unique-id$':
       '<rootDir>/test-stubs/pear-apps-utils-generate-unique-id.js',
-    '^@tetherto/pear-apps-utils-validator$':
+    '^lockwright-utils-validator$':
       '<rootDir>/test-stubs/pear-apps-utils-validator.js',
-    '^@tetherto/pear-apps-utils-pattern-search$':
+    '^lockwright-utils-pattern-search$':
       '<rootDir>/test-stubs/pear-apps-utils-pattern-search.js',
-    '^@tetherto/pearpass-lib-constants$':
+    '^lockwright-lib-constants$':
       '<rootDir>/test-stubs/pearpass-lib-constants.js'
   }
 }

@@ -9,7 +9,7 @@ jest.mock('./validateAndPrepareCustomFields', () => ({
   customFieldSchema: {}
 }))
 
-jest.mock('@tetherto/pear-apps-utils-validator', () => ({
+jest.mock('lockwright-utils-validator', () => ({
   Validator: {
     object: jest.fn(() => ({ validate: jest.fn() })),
     string: jest.fn(() => ({ required: jest.fn() })),

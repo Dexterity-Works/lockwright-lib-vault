@@ -1,4 +1,4 @@
-import { Validator } from '@tetherto/pear-apps-utils-validator'
+import { Validator } from 'lockwright-utils-validator'
 
 export const fileSchema = Validator.object({
   id: Validator.string().required(),

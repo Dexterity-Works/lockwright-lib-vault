@@ -1,4 +1,4 @@
-import { Validator } from '@tetherto/pear-apps-utils-validator'
+import { Validator } from 'lockwright-utils-validator'
 
 import { parseOtpInput } from './parseOtpInput'
 import {

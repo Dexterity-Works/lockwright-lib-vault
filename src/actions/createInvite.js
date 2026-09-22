@@ -1,6 +1,6 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
-import { generateUniqueId } from '@tetherto/pear-apps-utils-generate-unique-id'
-import { Validator } from '@tetherto/pear-apps-utils-validator'
+import { generateUniqueId } from 'lockwright-utils-generate-unique-id'
+import { Validator } from 'lockwright-utils-validator'
 
 import { createInvite as createInviteApi } from '../api/createInvite'
 import { VERSION } from '../constants/version'

@@ -1,8 +1,8 @@
-import { matchPatternToValue } from '@tetherto/pear-apps-utils-pattern-search'
+import { matchPatternToValue } from 'lockwright-utils-pattern-search'
 
 import { selectRecords } from './selectRecords'
 
-jest.mock('@tetherto/pear-apps-utils-pattern-search', () => ({
+jest.mock('lockwright-utils-pattern-search', () => ({
   matchPatternToValue: jest.fn()
 }))
 

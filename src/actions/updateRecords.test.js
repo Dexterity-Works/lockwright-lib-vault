@@ -14,7 +14,7 @@ jest.mock('../api/listRecords', () => ({
   listRecords: jest.fn()
 }))
 
-jest.mock('@tetherto/pear-apps-utils-generate-unique-id', () => ({
+jest.mock('lockwright-utils-generate-unique-id', () => ({
   generateUniqueId: jest.fn(() => 'unique-id')
 }))
 

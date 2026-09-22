@@ -1,5 +1,5 @@
 jest.mock(
-  '@tetherto/pear-apps-utils-generate-unique-id',
+  'lockwright-utils-generate-unique-id',
   () => ({ generateUniqueId: jest.fn(() => 'fixed-id') }),
   { virtual: true }
 )

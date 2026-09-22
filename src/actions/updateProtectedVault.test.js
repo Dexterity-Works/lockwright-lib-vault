@@ -1,4 +1,4 @@
-const { __validateRef } = require('@tetherto/pear-apps-utils-validator')
+const { __validateRef } = require('lockwright-utils-validator')
 
 const { updateProtectedVault } = require('./updateProtectedVault')
 const { getVaultByIdAndClose } = require('../api/getVaultByIdAndClose')
@@ -10,7 +10,7 @@ jest.mock('@reduxjs/toolkit', () => ({
   createAsyncThunk: (_type, payloadCreator) => payloadCreator
 }))
 
-jest.mock('@tetherto/pear-apps-utils-validator', () => {
+jest.mock('lockwright-utils-validator', () => {
   const validateRef = { fn: () => null }
   const chain = () => ({ required: jest.fn(() => ({})) })
   return {

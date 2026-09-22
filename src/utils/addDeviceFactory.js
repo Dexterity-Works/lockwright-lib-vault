@@ -1,4 +1,4 @@
-import { generateUniqueId } from '@tetherto/pear-apps-utils-generate-unique-id'
+import { generateUniqueId } from 'lockwright-utils-generate-unique-id'
 
 import { validateAndPrepareDevice } from './validateAndPrepareDevice'
 import { SCHEMA_V2 } from '../compat/recordSchema'

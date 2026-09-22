@@ -1,5 +1,5 @@
 {
-  "name": "@tetherto/pearpass-lib-vault",
+  "name": "lockwright-lib-vault",
   "version": "0.1.0",
   "type": "module",
   "description": "A library for vault management",

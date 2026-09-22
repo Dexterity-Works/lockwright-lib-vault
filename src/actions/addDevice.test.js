@@ -1,4 +1,4 @@
-import { generateUniqueId } from '@tetherto/pear-apps-utils-generate-unique-id'
+import { generateUniqueId } from 'lockwright-utils-generate-unique-id'
 
 import { addDevice } from './addDevice'
 import { addDevice as addDeviceApi } from '../api/addDevice'
@@ -9,7 +9,7 @@ jest.mock('../api/addDevice', () => ({
   addDevice: jest.fn()
 }))
 
-jest.mock('@tetherto/pear-apps-utils-generate-unique-id', () => ({
+jest.mock('lockwright-utils-generate-unique-id', () => ({
   generateUniqueId: jest.fn()
 }))
 

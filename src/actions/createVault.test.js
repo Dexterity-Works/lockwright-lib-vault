@@ -1,4 +1,4 @@
-import { generateUniqueId } from '@tetherto/pear-apps-utils-generate-unique-id'
+import { generateUniqueId } from 'lockwright-utils-generate-unique-id'
 
 import { createVault } from './createVault'
 import { createProtectedVault } from '../api/createProtectedVault'
@@ -13,7 +13,7 @@ jest.mock('../api/createUnprotectedVault', () => ({
   createUnprotectedVault: jest.fn()
 }))
 
-jest.mock('@tetherto/pear-apps-utils-generate-unique-id', () => ({
+jest.mock('lockwright-utils-generate-unique-id', () => ({
   generateUniqueId: jest.fn()
 }))
 

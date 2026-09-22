@@ -1,5 +1,5 @@
-import { generateUniqueId } from '@tetherto/pear-apps-utils-generate-unique-id'
-import { Validator } from '@tetherto/pear-apps-utils-validator'
+import { generateUniqueId } from 'lockwright-utils-generate-unique-id'
+import { Validator } from 'lockwright-utils-validator'
 
 export const recordSchema = Validator.object({
   id: Validator.string().required(),

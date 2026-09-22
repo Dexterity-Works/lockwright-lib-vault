@@ -1,4 +1,4 @@
-import { generateUniqueId } from '@tetherto/pear-apps-utils-generate-unique-id'
+import { generateUniqueId } from 'lockwright-utils-generate-unique-id'
 
 import { createInvite, inviteSchema } from './createInvite'
 import { createInvite as createInviteApi } from '../api/createInvite'
@@ -8,7 +8,7 @@ jest.mock('../api/createInvite', () => ({
   createInvite: jest.fn()
 }))
 
-jest.mock('@tetherto/pear-apps-utils-generate-unique-id', () => ({
+jest.mock('lockwright-utils-generate-unique-id', () => ({
   generateUniqueId: jest.fn()
 }))
 
