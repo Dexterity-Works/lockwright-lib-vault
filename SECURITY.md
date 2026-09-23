@@ -1,6 +1,5 @@
 # Report a security issue
 
-To report a security issue, please email [security-oss@tether.io](mailto:security-oss@tether.io).
+Email [security-lockwright@dexterity.works](mailto:security-lockwright@dexterity.works).
 
-We will respond within 5 working days of your report. Coordination and disclosure
-will be handled here on GitHub (including using GitHub Security Advisory).
+Do not file a public issue for an unfixed vulnerability.
