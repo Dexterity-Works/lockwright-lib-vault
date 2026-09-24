@@ -1,6 +1,7 @@
 import { pairActiveVault } from './pairActiveVault'
 import { pearpassVaultClient } from '../instances'
 import { getMasterPasswordEncryption } from './getMasterPasswordEncryption'
+import { listVaults } from './listVaults'
 
 jest.mock('../instances', () => ({
   pearpassVaultClient: {
@@ -12,6 +13,8 @@ jest.mock('../instances', () => ({
     vaultsAdd: jest.fn()
   }
 }))
+
+jest.mock('./listVaults', () => ({ listVaults: jest.fn() }))
 
 jest.mock('./getMasterPasswordEncryption', () => ({
   getMasterPasswordEncryption: jest.fn()
@@ -46,6 +49,7 @@ describe('pairActiveVault', () => {
     })
     pearpassVaultClient.encryptVaultWithKey.mockResolvedValue(mockEncryptResult)
     pearpassVaultClient.activeVaultGet.mockResolvedValue(mockVault)
+    listVaults.mockResolvedValue([{ id: 'other-vault' }])
   })
 
   it('should successfully pairActiveVault with invite code and return vault ID', async () => {
@@ -89,6 +93,18 @@ describe('pairActiveVault', () => {
       `vault/${mockVaultId}`,
       { ...mockVault, encryption: { ciphertext: 'ct', nonce: 'n', salt: 's' } }
     )
+  })
+
+  it('refuses an invite whose vault id is already in the catalog', async () => {
+    listVaults.mockResolvedValue([{ id: mockVaultId, name: 'Mine' }])
+
+    await expect(pairActiveVault(`${mockVaultId}/invite-key`)).rejects.toThrow(
+      'Vault already exists on this device'
+    )
+
+    expect(pearpassVaultClient.pairActiveVault).not.toHaveBeenCalled()
+    expect(pearpassVaultClient.activeVaultInit).not.toHaveBeenCalled()
+    expect(pearpassVaultClient.vaultsAdd).not.toHaveBeenCalled()
   })
 
   it('should throw error when vault key decryption fails', async () => {
