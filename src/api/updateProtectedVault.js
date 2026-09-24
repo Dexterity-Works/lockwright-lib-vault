@@ -2,6 +2,7 @@ import { constantTimeHashCompare } from 'lockwright-utils-password-check'
 
 import { pearpassVaultClient } from '../instances'
 import { getMasterPasswordEncryption } from './getMasterPasswordEncryption'
+import { toCatalogVault } from '../utils/toCatalogVault'
 import { updateVaultPassword } from './helpers/updateVaultPassword'
 import { initActiveVaultWithCredentials } from './initActiveVaultWithCredentials'
 import { listVaults } from './listVaults'
@@ -79,7 +80,10 @@ const updateActiveProtectedVault = async ({
   }
 
   await pearpassVaultClient.activeVaultAdd(`vault`, vault)
-  await pearpassVaultClient.vaultsAdd(`vault/${vault.id}`, vault)
+  await pearpassVaultClient.vaultsAdd(
+    `vault/${vault.id}`,
+    toCatalogVault(vault)
+  )
 }
 
 /**
@@ -133,7 +137,10 @@ const updateInactiveProtectedVault = async ({
     await updateVaultPassword(newPassword, vault)
   } else {
     await pearpassVaultClient.activeVaultAdd(`vault`, vault)
-    await pearpassVaultClient.vaultsAdd(`vault/${vault.id}`, vault)
+    await pearpassVaultClient.vaultsAdd(
+      `vault/${vault.id}`,
+      toCatalogVault(vault)
+    )
   }
 
   await initActiveVaultWithCredentials(activeVault.id, activeVaultEncryption)

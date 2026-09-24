@@ -142,6 +142,27 @@ describe('getVaultById', () => {
     })
   })
 
+  it('refuses catalog credentials for a closed protected vault', async () => {
+    const catalogEncryption = {
+      ciphertext: 'cipher',
+      nonce: 'nonce',
+      salt: 'salt'
+    }
+    listVaults.mockResolvedValue([
+      { id: 'vault1', encryption: catalogEncryption }
+    ])
+    pearpassVaultClient.activeVaultGetStatus.mockResolvedValue({
+      status: false
+    })
+
+    await expect(
+      getVaultById('vault1', { ...catalogEncryption, hashedPassword: 'kek' })
+    ).rejects.toThrow('Vault password is required')
+
+    expect(pearpassVaultClient.decryptVaultKey).not.toHaveBeenCalled()
+    expect(pearpassVaultClient.activeVaultInit).not.toHaveBeenCalled()
+  })
+
   describe('when no password is provided', () => {
     it('throws error if decryption fails (decryptVaultKey returns falsy)', async () => {
       listVaults.mockResolvedValue([{ id: 'vault1' }])

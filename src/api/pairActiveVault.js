@@ -1,5 +1,6 @@
 import { pearpassVaultClient } from '../instances'
 import { getMasterPasswordEncryption } from './getMasterPasswordEncryption'
+import { toCatalogVault } from '../utils/toCatalogVault'
 
 /**
  * @param {string} inviteCode
@@ -25,7 +26,7 @@ export const pairActiveVault = async (inviteCode) => {
 
   const vault = await pearpassVaultClient.activeVaultGet(`vault`)
 
-  await pearpassVaultClient.vaultsAdd(`vault/${vaultId}`, vault)
+  await pearpassVaultClient.vaultsAdd(`vault/${vaultId}`, toCatalogVault(vault))
 
   return vaultId
 }

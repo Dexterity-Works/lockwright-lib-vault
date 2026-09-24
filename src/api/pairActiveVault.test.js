@@ -72,6 +72,25 @@ describe('pairActiveVault', () => {
     expect(result).toBe(mockVaultId)
   })
 
+  it('keeps a protected vault KEK out of the master catalog', async () => {
+    pearpassVaultClient.activeVaultGet.mockResolvedValue({
+      ...mockVault,
+      encryption: {
+        ciphertext: 'ct',
+        nonce: 'n',
+        salt: 's',
+        hashedPassword: 'kek'
+      }
+    })
+
+    await pairActiveVault(mockInviteCode)
+
+    expect(pearpassVaultClient.vaultsAdd).toHaveBeenCalledWith(
+      `vault/${mockVaultId}`,
+      { ...mockVault, encryption: { ciphertext: 'ct', nonce: 'n', salt: 's' } }
+    )
+  })
+
   it('should throw error when vault key decryption fails', async () => {
     pearpassVaultClient.decryptVaultKey.mockResolvedValue(null)
 

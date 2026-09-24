@@ -1,4 +1,5 @@
 import { pearpassVaultClient } from '../instances'
+import { toCatalogVault } from '../utils/toCatalogVault'
 
 /**
  * @returns {Promise<Array<any>>}
@@ -6,5 +7,7 @@ import { pearpassVaultClient } from '../instances'
 export const listVaults = async () => {
   const vaults = await pearpassVaultClient.vaultsList('vault/')
 
-  return vaults
+  // Older renames and pairs wrote encryption.hashedPassword here. Drop it on
+  // read; the next catalog write of that vault drops it from the store.
+  return vaults?.map(toCatalogVault)
 }

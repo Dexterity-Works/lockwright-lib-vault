@@ -13,10 +13,14 @@ import { listVaults } from './listVaults'
  */
 export const getVaultById = async (vaultId, params) => {
   const vaults = await listVaults()
+  const catalogVault = vaults.find((vault) => vault.id === vaultId)
 
-  if (!vaults.some((vault) => vault.id === vaultId)) {
+  if (!catalogVault) {
     throw new Error('Vault not found')
   }
+
+  const { ciphertext, nonce, salt } = catalogVault.encryption || {}
+  const isProtected = !!(ciphertext && nonce && salt)
 
   const res = await pearpassVaultClient.activeVaultGetStatus()
 
@@ -25,14 +29,25 @@ export const getVaultById = async (vaultId, params) => {
 
     if (currentVault && vaultId === currentVault.id) {
       return currentVault
-    } else {
-      await pearpassVaultClient.activeVaultClose()
     }
+  }
+
+  const hasRawCredentials =
+    params?.ciphertext && params?.nonce && params?.hashedPassword
+
+  // A closed protected vault opens only from its password. Raw credentials
+  // would let a KEK copied out of the catalog open it without one.
+  if (hasRawCredentials && isProtected) {
+    throw new Error('Vault password is required')
+  }
+
+  if (res?.status) {
+    await pearpassVaultClient.activeVaultClose()
   }
 
   let encryptionKey
 
-  if (params?.ciphertext && params?.nonce && params?.hashedPassword) {
+  if (hasRawCredentials) {
     encryptionKey = await pearpassVaultClient.decryptVaultKey({
       ciphertext: params.ciphertext,
       nonce: params.nonce,
@@ -55,14 +70,6 @@ export const getVaultById = async (vaultId, params) => {
       nonce: masterEncryption.nonce
     })
   } else {
-    const vault = vaults.find((vault) => vault.id === vaultId)
-
-    if (!vault) {
-      throw new Error('Vault not found')
-    }
-
-    const { ciphertext, nonce, salt } = vault.encryption || {}
-
     const hashedPassword = await pearpassVaultClient.getDecryptionKey({
       password: params.password,
       salt
