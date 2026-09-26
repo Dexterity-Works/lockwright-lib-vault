@@ -43,6 +43,10 @@
   },
   "dependencies": {
     "@reduxjs/toolkit": "2.5.0",
+    "lockwright-lib-constants": "git+https://github.com/Dexterity-Works/lockwright-lib-constants.git#f6142c9554e9f972519dd8115b2b73f02b73d5fb",
+    "lockwright-utils-generate-unique-id": "git+https://github.com/Dexterity-Works/lockwright-utils-generate-unique-id.git#b1cec22b12b85bb1186aafa05223be64b7aea2cc",
+    "lockwright-utils-password-check": "git+https://github.com/Dexterity-Works/lockwright-utils-password-check.git#dc56473c03d574ddb80a98f2560cea69d01b1cca",
+    "lockwright-utils-validator": "git+https://github.com/Dexterity-Works/lockwright-utils-validator.git#95488f2c385ec7b09619c587417baf454134dd7b",
     "react-redux": "9.1.2"
   },
   "packageManager": "pnpm@11.10.0",
