@@ -8,8 +8,7 @@
   "scripts": {
     "lint:fix": "eslint --fix .",
     "lint": "eslint .",
-    "test": "jest",
-    "preinstall": "node scripts/ensure-pnpm.mjs"
+    "test": "jest"
   },
   "peerDependencies": {
     "lockwright-lib-constants": "*",
