@@ -17,6 +17,7 @@ Newer contributors are encouraged to start small. Tests, both failing and passin
 
 - Keep pull requests focused on a single feature or bug fix
 - Provide a clear description of changes
+- After cloning, run `git config core.hooksPath .husky` so the pre-commit lint hook runs
 - Ensure code passes linting: `pnpm run lint`
 - Ensure tests are passing: `pnpm test`
   - except any added failing tests
