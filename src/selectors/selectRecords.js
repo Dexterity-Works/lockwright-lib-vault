@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit'
-import { matchPatternToValue } from 'lockwright-utils-pattern-search'
 
 import { deriveWebsitesFromUris } from '../compat/recordSchema'
+import { matchPatternToValue } from '../utils/matchPatternToValue'
 
 export const selectRecords = ({ filters, sort } = {}) =>
   createSelector(

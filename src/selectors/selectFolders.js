@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit'
-import { matchPatternToValue } from 'lockwright-utils-pattern-search'
 
 import { selectRecords } from './selectRecords'
+import { matchPatternToValue } from '../utils/matchPatternToValue'
 
 export const selectFolders = (filters) =>
   createSelector(

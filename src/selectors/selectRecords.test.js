@@ -1,8 +1,7 @@
-import { matchPatternToValue } from 'lockwright-utils-pattern-search'
-
 import { selectRecords } from './selectRecords'
+import { matchPatternToValue } from '../utils/matchPatternToValue'
 
-jest.mock('lockwright-utils-pattern-search', () => ({
+jest.mock('../utils/matchPatternToValue', () => ({
   matchPatternToValue: jest.fn()
 }))
 
