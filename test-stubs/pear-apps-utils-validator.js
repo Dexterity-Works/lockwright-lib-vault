@@ -3,7 +3,10 @@
  * is not linked. Mirrors the subset used by pearpass-lib-vault.
  */
 
-const isAbsent = (value) => value === undefined
+const isEmpty = (value) =>
+  value === undefined ||
+  value === null ||
+  (typeof value === 'string' && value.trim() === '')
 
 const makeNode = (checks = []) => {
   const node = {
@@ -25,7 +28,7 @@ const makeNode = (checks = []) => {
 
 const runChecks = (value, checks) => {
   for (const check of checks) {
-    if (check.type === 'required' && isAbsent(value)) {
+    if (check.type === 'required' && isEmpty(value)) {
       return { required: true }
     }
     if (check.type === 'string') {
@@ -59,13 +62,7 @@ const runChecks = (value, checks) => {
         return { type: 'array' }
       }
     }
-    if (check.type === 'items' && Array.isArray(value)) {
-      if (
-        !check.itemSchema ||
-        typeof check.itemSchema.validate !== 'function'
-      ) {
-        return { items: 'invalid-item-schema' }
-      }
+    if (check.type === 'items' && check.itemSchema && Array.isArray(value)) {
       for (const item of value) {
         const err = check.itemSchema.validate(item)
         if (err) return err

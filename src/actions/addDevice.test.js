@@ -2,6 +2,7 @@ import { generateUniqueId } from 'lockwright-utils-generate-unique-id'
 
 import { addDevice } from './addDevice'
 import { addDevice as addDeviceApi } from '../api/addDevice'
+import { SCHEMA_V2 } from '../compat/recordSchema'
 import { setPearpassVaultClient, pearpassVaultClient } from '../instances'
 import { validateAndPrepareDevice } from '../utils/validateAndPrepareDevice'
 
@@ -60,7 +61,8 @@ describe('addDevice', () => {
       vaultId: mockVaultId,
       name: mockDeviceName,
       writerKey: mockWriterKey,
-      createdAt: mockDate
+      createdAt: mockDate,
+      recordSchema: SCHEMA_V2
     })
   })
 
@@ -73,7 +75,8 @@ describe('addDevice', () => {
       vaultId: mockVaultId,
       name: mockDeviceName,
       writerKey: mockWriterKey,
-      createdAt: mockDate
+      createdAt: mockDate,
+      recordSchema: SCHEMA_V2
     })
   })
 
@@ -103,7 +106,8 @@ describe('addDevice', () => {
       name: mockDeviceName,
       writerKey: mockWriterKey,
       createdAt: 0,
-      masterTopic: null
+      masterTopic: null,
+      recordSchema: SCHEMA_V2
     }
     getState.mockReturnValueOnce({
       vault: {
