@@ -1,4 +1,4 @@
-import { generateUniqueId } from 'lockwright-utils-generate-unique-id'
+import { generateUniqueId } from 'lockwright-lib-utils/generate-unique-id'
 
 import { createFolder } from './createFolder'
 import { createRecord } from '../api/createRecord'
@@ -7,7 +7,7 @@ jest.mock('../api/createRecord', () => ({
   createRecord: jest.fn()
 }))
 
-jest.mock('lockwright-utils-generate-unique-id', () => ({
+jest.mock('lockwright-lib-utils/generate-unique-id', () => ({
   generateUniqueId: jest.fn()
 }))
 

@@ -36,7 +36,7 @@ describe('validateAndPrepareRecord', () => {
     jest.clearAllMocks()
     jest.resetModules()
 
-    jest.doMock('lockwright-utils-validator', () => ({
+    jest.doMock('lockwright-lib-utils/validator', () => ({
       Validator: {
         object: jest.fn().mockImplementation(() => ({
           validate: jest.fn(() => ({ error: 'completely new behavior' }))
@@ -237,7 +237,7 @@ describe('validateAndPrepareRecord', () => {
   })
 
   test('should throw error for invalid record', () => {
-    const { Validator } = require('lockwright-utils-validator')
+    const { Validator } = require('lockwright-lib-utils/validator')
 
     Validator.object.mockImplementationOnce(() => ({
       validate: jest.fn(() => ({

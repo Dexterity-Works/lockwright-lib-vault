@@ -2,7 +2,7 @@ import { broadcastAction } from './broadcastAction'
 import { pearpassVaultClient } from '../instances'
 
 jest.mock(
-  'lockwright-utils-generate-unique-id',
+  'lockwright-lib-utils/generate-unique-id',
   () => ({ generateUniqueId: jest.fn(() => 'fixed-id') }),
   { virtual: true }
 )

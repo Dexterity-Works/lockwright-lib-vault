@@ -4,7 +4,7 @@ import { prepareIdentityFiles } from './validateAndPrepareIdentityData'
 
 jest.mock('./processFiles')
 jest.mock('./validateAndPrepareIdentityData')
-jest.mock('lockwright-utils-generate-unique-id', () => ({
+jest.mock('lockwright-lib-utils/generate-unique-id', () => ({
   generateUniqueId: jest.fn()
 }))
 

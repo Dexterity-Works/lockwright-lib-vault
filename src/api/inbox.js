@@ -1,4 +1,4 @@
-import { generateUniqueId } from 'lockwright-utils-generate-unique-id'
+import { generateUniqueId } from 'lockwright-lib-utils/generate-unique-id'
 
 import { ACTIONS } from '../actions'
 import { pearpassVaultClient } from '../instances'

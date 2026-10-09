@@ -6,7 +6,7 @@ import { listVaults } from './listVaults'
 
 // Not a declared dependency of this package; hosts provide it.
 jest.mock(
-  'lockwright-utils-password-check',
+  'lockwright-lib-utils/password-check',
   () => ({ constantTimeHashCompare: (a, b) => a === b }),
   { virtual: true }
 )

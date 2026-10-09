@@ -1,5 +1,5 @@
-import { generateUniqueId } from 'lockwright-utils-generate-unique-id'
-import { Validator } from 'lockwright-utils-validator'
+import { generateUniqueId } from 'lockwright-lib-utils/generate-unique-id'
+import { Validator } from 'lockwright-lib-utils/validator'
 
 export const recordSchema = Validator.object({
   id: Validator.string().required(),

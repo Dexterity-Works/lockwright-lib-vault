@@ -29,7 +29,7 @@ const mockCredential = {
 }
 
 jest.mock('./validateAndPrepareCustomFields', () => {
-  const { Validator } = require('lockwright-utils-validator')
+  const { Validator } = require('lockwright-lib-utils/validator')
   return {
     customFieldSchema: Validator.object({
       type: Validator.string().required(),

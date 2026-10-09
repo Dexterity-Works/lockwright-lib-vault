@@ -27,7 +27,7 @@ describe('validateAndPrepareIdentityData', () => {
     jest.clearAllMocks()
     jest.resetModules()
 
-    jest.doMock('lockwright-utils-validator', () => ({
+    jest.doMock('lockwright-lib-utils/validator', () => ({
       Validator: {
         object: jest.fn().mockImplementation(() => ({
           validate: jest.fn(() => ({ error: 'completely new behavior' }))

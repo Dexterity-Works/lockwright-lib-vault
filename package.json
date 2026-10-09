@@ -12,9 +12,7 @@
   },
   "peerDependencies": {
     "lockwright-lib-constants": "*",
-    "lockwright-utils-generate-unique-id": "*",
-    "lockwright-utils-password-check": "*",
-    "lockwright-utils-validator": "*",
+    "lockwright-lib-utils": "*",
     "react": ">=18.3.1",
     "react-dom": ">=18.3.1"
   },
@@ -40,9 +38,7 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "lockwright-lib-constants": "git+https://github.com/Dexterity-Works/lockwright-lib-constants.git#f6142c9554e9f972519dd8115b2b73f02b73d5fb",
-    "lockwright-utils-generate-unique-id": "git+https://github.com/Dexterity-Works/lockwright-utils-generate-unique-id.git#b1cec22b12b85bb1186aafa05223be64b7aea2cc",
-    "lockwright-utils-password-check": "git+https://github.com/Dexterity-Works/lockwright-utils-password-check.git#dc56473c03d574ddb80a98f2560cea69d01b1cca",
-    "lockwright-utils-validator": "git+https://github.com/Dexterity-Works/lockwright-utils-validator.git#95488f2c385ec7b09619c587417baf454134dd7b",
+    "lockwright-lib-utils": "git+https://github.com/Dexterity-Works/lockwright-lib-utils.git#93ccdd5601caede2049f484f79acd0f88d9f4a89",
     "prettier": "^3.4.2",
     "react": ">=18.3.1",
     "react-dom": ">=18.3.1",

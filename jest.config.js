@@ -10,9 +10,9 @@ export default {
     customExportConditions: ['node', 'node-addons']
   },
   moduleNameMapper: {
-    '^lockwright-utils-generate-unique-id$':
+    '^lockwright-lib-utils/generate-unique-id$':
       '<rootDir>/test-stubs/pear-apps-utils-generate-unique-id.js',
-    '^lockwright-utils-validator$':
+    '^lockwright-lib-utils/validator$':
       '<rootDir>/test-stubs/pear-apps-utils-validator.js',
     '^lockwright-lib-constants$':
       '<rootDir>/test-stubs/pearpass-lib-constants.js'

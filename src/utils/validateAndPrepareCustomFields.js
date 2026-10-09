@@ -1,4 +1,4 @@
-import { Validator } from 'lockwright-utils-validator'
+import { Validator } from 'lockwright-lib-utils/validator'
 
 export const customFieldSchema = Validator.object({
   type: Validator.string().required(),

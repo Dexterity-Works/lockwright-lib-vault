@@ -1,8 +1,8 @@
-import { generateUniqueId } from 'lockwright-utils-generate-unique-id'
+import { generateUniqueId } from 'lockwright-lib-utils/generate-unique-id'
 
 import { processFiles } from './processFiles'
 
-jest.mock('lockwright-utils-generate-unique-id', () => ({
+jest.mock('lockwright-lib-utils/generate-unique-id', () => ({
   generateUniqueId: jest.fn()
 }))
 

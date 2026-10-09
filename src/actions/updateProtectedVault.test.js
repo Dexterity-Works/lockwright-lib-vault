@@ -1,4 +1,4 @@
-const { __validateRef } = require('lockwright-utils-validator')
+const { __validateRef } = require('lockwright-lib-utils/validator')
 
 const { updateProtectedVault } = require('./updateProtectedVault')
 const { getVaultByIdAndClose } = require('../api/getVaultByIdAndClose')
@@ -10,7 +10,7 @@ jest.mock('@reduxjs/toolkit', () => ({
   createAsyncThunk: (_type, payloadCreator) => payloadCreator
 }))
 
-jest.mock('lockwright-utils-validator', () => {
+jest.mock('lockwright-lib-utils/validator', () => {
   const validateRef = { fn: () => null }
   const chain = () => ({ required: jest.fn(() => ({})) })
   return {
