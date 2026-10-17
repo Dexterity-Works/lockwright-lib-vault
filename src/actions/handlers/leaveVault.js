@@ -35,9 +35,13 @@ export const leaveVaultActionHandler = {
       start: true
     })
     if (epoch?.rotated === true || epoch?.reason === 'current') return
-    // Another member has to rotate; it does so when it syncs the removal.
+    // Another member has to rotate; the core's update handler does it when
+    // the key arrives. The rows are gone, so this leave is done.
     if (epoch?.reason === 'pending') {
-      return { status: 'deferred', reason: 'epoch-pending' }
+      logger.log('leave-vault: rotation pending on another member', {
+        actorId
+      })
+      return
     }
     throw new Error(
       `leave-vault: epoch rotation failed: ${epoch?.reason ?? 'no result'}`

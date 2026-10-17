@@ -193,7 +193,7 @@ describe('leaveVaultActionHandler', () => {
     ).resolves.toBeUndefined()
   })
 
-  it('defers while another member has to rotate', async () => {
+  it('treats a rotation left to another member as done once the rows are gone', async () => {
     listDevices.mockResolvedValue([{ id: 'B', writerKey: 'writer-B' }])
     pearpassVaultClient.activeVaultEnsureEpoch.mockResolvedValue({
       rotated: false,
@@ -201,10 +201,12 @@ describe('leaveVaultActionHandler', () => {
       uncovered: []
     })
 
-    await expect(leaveVaultActionHandler.execute(leave)).resolves.toEqual({
-      status: 'deferred',
-      reason: 'epoch-pending'
-    })
+    await expect(
+      leaveVaultActionHandler.execute(leave)
+    ).resolves.toBeUndefined()
+    expect(pearpassVaultClient.activeVaultRemove).toHaveBeenCalledWith(
+      'device/B'
+    )
   })
 
   it('throws on any other rotation that did not happen', async () => {
