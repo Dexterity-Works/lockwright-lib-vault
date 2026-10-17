@@ -326,4 +326,55 @@ describe('kickDevice', () => {
     expect(pearpassVaultClient.activeVaultEnsureEpoch).not.toHaveBeenCalled()
     expect(result.epoch).toBeNull()
   })
+
+  it('sweeps rows sharing a writerKey or masterTopic, revoking every swept writer first and the primary row last', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', writerKey: 'w-self', masterTopic: 't-self' },
+      { id: 'B', writerKey: 'w-b', masterTopic: 't-b' },
+      { id: 'B2', writerKey: 'w-b2', masterTopic: 't-b' },
+      { id: 'B3', writerKey: 'w-b' },
+      { id: 'S2', writerKey: 'w-self', masterTopic: 't-b' },
+      { id: 'C', writerKey: 'w-c', masterTopic: 't-c' }
+    ])
+    const calls = []
+    pearpassVaultClient.activeVaultRemoveWriter.mockImplementation(async (k) =>
+      calls.push(['removeWriter', k])
+    )
+    pearpassVaultClient.activeVaultRemove.mockImplementation(async (k) =>
+      calls.push(['remove', k])
+    )
+
+    await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+    const writers = calls.filter(([op]) => op === 'removeWriter')
+    const removes = calls.filter(([op]) => op === 'remove')
+    expect(writers.map(([, k]) => k).sort()).toEqual(['w-b', 'w-b2'])
+    expect(calls.slice(0, writers.length)).toEqual(writers)
+    expect(removes.map(([, k]) => k).sort()).toEqual([
+      'device/B',
+      'device/B2',
+      'device/B3'
+    ])
+    expect(calls.at(-1)).toEqual(['remove', 'device/B'])
+  })
+
+  it('leaves the primary row for a retry when a duplicate delete throws', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', writerKey: 'w-self' },
+      { id: 'B', writerKey: 'w-b' },
+      { id: 'B2', writerKey: 'w-b' }
+    ])
+    const boom = new Error('remove failed')
+    pearpassVaultClient.activeVaultRemove.mockImplementation(async (k) => {
+      if (k === 'device/B2') throw boom
+    })
+
+    const result = await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+    expect(pearpassVaultClient.activeVaultRemove).not.toHaveBeenCalledWith(
+      'device/B'
+    )
+    expect(result.failures).toEqual([{ targetDeviceId: 'B', error: boom }])
+    expect(pearpassVaultClient.activeVaultEnsureEpoch).not.toHaveBeenCalled()
+  })
 })

@@ -3,6 +3,7 @@ import { pearpassVaultClient } from '../instances'
 import { broadcastAction } from './broadcastAction'
 import { listDevices } from './listDevices'
 import { logger } from '../utils/logger'
+import { sweepDeviceRows } from '../utils/sweepDeviceRows'
 
 // Marks a `failures` entry as a key rotation that did not happen, as opposed
 // to an envelope or roster failure.
@@ -84,33 +85,17 @@ export const kickDevice = async ({ vaultId, targetDeviceId } = {}) => {
   //    a partial-delivery failure: the envelope already shipped and the
   //    target will wipe regardless of whether our local writer can append.
   try {
-    if (target.writerKey) {
-      await pearpassVaultClient.activeVaultRemoveWriter(target.writerKey)
-    } else {
+    if (!target.writerKey) {
       logger.error(
         'kickDevice: target has no writerKey; skipping removeWriter',
         { targetDeviceId }
       )
     }
 
-    // 3. Drop every app-layer index entry mapped to the target's writerKey.
-    //    Duplicate device/<id> rows can exist for the same physical peer
-    //    (e.g. stale-name heal during re-pair appended a fresh entry while
-    //    the original survived); kicking the writer kills them all at the
-    //    protocol layer, so the index must mirror that or stranded rows
-    //    keep appearing in the paired-devices list.
-    const idsToRemove = target.writerKey
-      ? [
-          ...new Set(
-            devices
-              .filter((d) => d?.id && d.writerKey === target.writerKey)
-              .map((d) => d.id)
-          )
-        ]
-      : [targetDeviceId]
-    for (const id of idsToRemove) {
-      await pearpassVaultClient.activeVaultRemove(`device/${id}`)
-    }
+    // 3. Drop every app-layer index entry for the same peer (same writerKey
+    //    or masterTopic). A stranded row keeps appearing in the paired-
+    //    devices list and keeps the kicked device sealable for the epoch.
+    await sweepDeviceRows({ primary: target, devices, myWriterKey })
   } catch (error) {
     logger.error(
       'kickDevice: autobase removal failed; envelope already in flight',

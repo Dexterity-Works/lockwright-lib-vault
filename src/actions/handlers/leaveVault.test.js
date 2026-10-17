@@ -16,6 +16,7 @@ describe('leaveVaultActionHandler', () => {
     pearpassVaultClient.activeVaultGetWriterKey.mockResolvedValue('writer-A')
     pearpassVaultClient.activeVaultRemoveWriter.mockResolvedValue(undefined)
     pearpassVaultClient.activeVaultRemove.mockResolvedValue(undefined)
+    pearpassVaultClient.vaultsGet.mockResolvedValue(undefined)
     pearpassVaultClient.activeVaultEnsureEpoch.mockResolvedValue({
       rotated: true,
       id: 'e2',
@@ -99,24 +100,73 @@ describe('leaveVaultActionHandler', () => {
     })
   })
 
-  it('drops every row sharing the leaver writerKey or masterTopic', async () => {
+  it('drops every row sharing the leaver writerKey or masterTopic, revoking every swept writer first and the actor row last', async () => {
     listDevices.mockResolvedValue([
       { id: 'A', writerKey: 'writer-A', masterTopic: 't-a' },
       { id: 'B', writerKey: 'writer-B', masterTopic: 't-b' },
       { id: 'B2', writerKey: 'writer-B' },
-      { id: 'B3', masterTopic: 't-b' },
+      { id: 'B3', writerKey: 'writer-B3', masterTopic: 't-b' },
       { id: 'C', writerKey: 'writer-C', masterTopic: 't-c' }
+    ])
+    const calls = []
+    pearpassVaultClient.activeVaultRemoveWriter.mockImplementation(async (k) =>
+      calls.push(['removeWriter', k])
+    )
+    pearpassVaultClient.activeVaultRemove.mockImplementation(async (k) =>
+      calls.push(['remove', k])
+    )
+
+    await leaveVaultActionHandler.execute(leave)
+
+    const writers = calls.filter(([op]) => op === 'removeWriter')
+    const removes = calls.filter(([op]) => op === 'remove')
+    expect(writers.map(([, k]) => k).sort()).toEqual(['writer-B', 'writer-B3'])
+    expect(calls.slice(0, writers.length)).toEqual(writers)
+    expect(removes.map(([, k]) => k).sort()).toEqual([
+      'device/B',
+      'device/B2',
+      'device/B3'
+    ])
+    expect(calls.at(-1)).toEqual(['remove', 'device/B'])
+  })
+
+  it('keeps the actor row for the retry when a duplicate delete throws', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'B', writerKey: 'writer-B' },
+      { id: 'B2', writerKey: 'writer-B' }
+    ])
+    pearpassVaultClient.activeVaultRemove.mockImplementation(async (k) => {
+      if (k === 'device/B2') throw new Error('remove failed')
+    })
+
+    await expect(leaveVaultActionHandler.execute(leave)).rejects.toThrow(
+      'remove failed'
+    )
+    expect(pearpassVaultClient.activeVaultRemove).not.toHaveBeenCalledWith(
+      'device/B'
+    )
+    expect(pearpassVaultClient.activeVaultEnsureEpoch).not.toHaveBeenCalled()
+  })
+
+  it('keeps a row holding our writerKey even when it shares the actor masterTopic', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'A', writerKey: 'writer-A', masterTopic: 't-b' },
+      { id: 'B', writerKey: 'writer-B', masterTopic: 't-b' }
     ])
 
     await leaveVaultActionHandler.execute(leave)
 
-    const removed = pearpassVaultClient.activeVaultRemove.mock.calls.map(
-      ([k]) => k
+    expect(pearpassVaultClient.activeVaultRemove).toHaveBeenCalledTimes(1)
+    expect(pearpassVaultClient.activeVaultRemove).toHaveBeenCalledWith(
+      'device/B'
     )
-    expect(removed.sort()).toEqual(['device/B', 'device/B2', 'device/B3'])
+    expect(pearpassVaultClient.activeVaultRemoveWriter).toHaveBeenCalledWith(
+      'writer-B'
+    )
+    expect(pearpassVaultClient.activeVaultRemoveWriter).toHaveBeenCalledTimes(1)
   })
 
-  it('does not drop our own rows when the actor row carries our writerKey', async () => {
+  it('drops only the actor row when it carries our writerKey', async () => {
     listDevices.mockResolvedValue([
       { id: 'A', writerKey: 'writer-A' },
       { id: 'B', writerKey: 'writer-A' }
@@ -213,6 +263,66 @@ describe('leaveVaultActionHandler', () => {
     expect(first.failed).toBe(1)
     expect(second.processed).toBe(1)
     expect(pearpassVaultClient.activeVaultEnsureEpoch).toHaveBeenCalledTimes(2)
+    expect(record).toBeNull()
+  })
+
+  it('sweeps late duplicates from the peer record on a retry after the actor row is gone', async () => {
+    const entryKey = `${INBOX_PREFIX}1_leave`
+    let record = { envelope: leave }
+    let roster = [
+      { id: 'A', writerKey: 'writer-A' },
+      { id: 'B', writerKey: 'writer-B', masterTopic: 't-b' }
+    ]
+    pearpassVaultClient.vaultsFind.mockImplementation(async (opts) =>
+      opts?.gte?.key === INBOX_PREFIX && record
+        ? [{ key: entryKey, value: record }]
+        : []
+    )
+    pearpassVaultClient.vaultsAdd.mockImplementation(async (key, value) => {
+      if (key === entryKey) record = value
+    })
+    pearpassVaultClient.vaultsRemove.mockImplementation(async (key) => {
+      if (key === entryKey) record = null
+    })
+    pearpassVaultClient.vaultsGet.mockImplementation(async (key) =>
+      key === 'peer/B'
+        ? { id: 'B', writerKey: 'writer-B', masterTopic: 't-b' }
+        : undefined
+    )
+    listDevices.mockImplementation(async () => roster)
+    const calls = []
+    pearpassVaultClient.activeVaultRemoveWriter.mockImplementation(async (k) =>
+      calls.push(['removeWriter', k])
+    )
+    pearpassVaultClient.activeVaultRemove.mockImplementation(async (key) => {
+      calls.push(['remove', key])
+      roster = roster.filter((d) => `device/${d.id}` !== key)
+    })
+    pearpassVaultClient.activeVaultEnsureEpoch
+      .mockImplementationOnce(async () => {
+        calls.push(['ensureEpoch'])
+        // A stale row for the leaver replicates in after the first sweep.
+        roster = [
+          ...roster,
+          { id: 'B-old', writerKey: 'writer-B-old', masterTopic: 't-b' }
+        ]
+        throw new Error('rotation failed')
+      })
+      .mockImplementationOnce(async () => {
+        calls.push(['ensureEpoch'])
+        return { rotated: true, uncovered: [] }
+      })
+
+    await processInbox()
+    calls.length = 0
+    const second = await processInbox()
+
+    expect(second.processed).toBe(1)
+    expect(calls).toEqual([
+      ['removeWriter', 'writer-B-old'],
+      ['remove', 'device/B-old'],
+      ['ensureEpoch']
+    ])
     expect(record).toBeNull()
   })
 })
