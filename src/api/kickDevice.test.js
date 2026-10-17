@@ -377,4 +377,23 @@ describe('kickDevice', () => {
     expect(result.failures).toEqual([{ targetDeviceId: 'B', error: boom }])
     expect(pearpassVaultClient.activeVaultEnsureEpoch).not.toHaveBeenCalled()
   })
+
+  it.each([[undefined], [null], [{ uncovered: [] }]])(
+    'reports a rotation with no usable result (%p) as an epoch failure',
+    async (epochResult) => {
+      listDevices.mockResolvedValue([
+        { id: 'SELF', writerKey: 'w-self' },
+        { id: 'B', writerKey: 'w-b' }
+      ])
+      pearpassVaultClient.activeVaultEnsureEpoch.mockResolvedValue(epochResult)
+
+      const result = await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+      expect(result.failures).toHaveLength(1)
+      expect(result.failures[0].kind).toBe(EPOCH_FAILURE_KIND)
+      expect(result.failures[0].error.message).toBe(
+        'epoch rotation failed: no result'
+      )
+    }
+  )
 })

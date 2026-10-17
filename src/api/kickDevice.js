@@ -117,10 +117,16 @@ export const kickDevice = async ({ vaultId, targetDeviceId } = {}) => {
     epoch =
       (await pearpassVaultClient.activeVaultEnsureEpoch({ start: true })) ??
       null
-    if (epoch?.rotated === false && !EPOCH_OK_REASONS.includes(epoch.reason)) {
+    const reason =
+      typeof epoch?.rotated !== 'boolean'
+        ? 'no result'
+        : !epoch.rotated && !EPOCH_OK_REASONS.includes(epoch.reason)
+          ? epoch.reason
+          : null
+    if (reason) {
       failures.push({
         targetDeviceId,
-        error: new Error(`epoch rotation failed: ${epoch.reason}`),
+        error: new Error(`epoch rotation failed: ${reason}`),
         kind: EPOCH_FAILURE_KIND
       })
     }
