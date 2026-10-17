@@ -4,6 +4,14 @@ import { broadcastAction } from './broadcastAction'
 import { listDevices } from './listDevices'
 import { logger } from '../utils/logger'
 
+// Marks a `failures` entry as a key rotation that did not happen, as opposed
+// to an envelope or roster failure.
+export const EPOCH_FAILURE_KIND = 'epoch'
+
+// Rotation outcomes that are not failures: nothing to rotate, or another
+// member rotates when it syncs the removal.
+const EPOCH_OK_REASONS = ['current', 'pending']
+
 /**
  * Revoke a peer's access to the currently active vault. Removes the peer
  * from the autobase writer set (protocol-level revocation), drops their
@@ -13,7 +21,7 @@ import { logger } from '../utils/logger'
  * @param {{ vaultId: string, targetDeviceId: string }} params
  * @returns {Promise<{
  *   results: Array<{ targetDeviceId: string, channel: 'outbox' }>,
- *   failures: Array<{ targetDeviceId: string, error: Error }>,
+ *   failures: Array<{ targetDeviceId: string, error: Error, kind?: 'epoch' }>,
  *   epoch: object | null
  * }>}
  */
@@ -124,10 +132,11 @@ export const kickDevice = async ({ vaultId, targetDeviceId } = {}) => {
     epoch =
       (await pearpassVaultClient.activeVaultEnsureEpoch({ start: true })) ??
       null
-    if (epoch?.rotated === false && epoch.reason !== 'current') {
+    if (epoch?.rotated === false && !EPOCH_OK_REASONS.includes(epoch.reason)) {
       failures.push({
         targetDeviceId,
-        error: new Error(`epoch rotation failed: ${epoch.reason}`)
+        error: new Error(`epoch rotation failed: ${epoch.reason}`),
+        kind: EPOCH_FAILURE_KIND
       })
     }
   } catch (error) {
@@ -139,7 +148,8 @@ export const kickDevice = async ({ vaultId, targetDeviceId } = {}) => {
       error: new Error(
         `epoch rotation failed: ${error?.message ?? String(error)}`,
         { cause: error }
-      )
+      ),
+      kind: EPOCH_FAILURE_KIND
     })
   }
 

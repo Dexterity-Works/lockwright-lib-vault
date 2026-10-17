@@ -81,7 +81,14 @@ export interface PearpassVaultEpochClient {
   activeVaultGetEpochStatus(): Promise<EpochStatus>
 }
 
+export declare const EPOCH_FAILURE_KIND: 'epoch'
+
 export interface KickDeviceResult extends BroadcastActionResult {
+  failures: Array<{
+    targetDeviceId: string
+    error: Error
+    kind?: typeof EPOCH_FAILURE_KIND
+  }>
   epoch: EnsureEpochResult | null
 }
 
