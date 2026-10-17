@@ -4,6 +4,8 @@ let currentDeviceNameValue = null
 let envelopeSubscription = null
 let newListenerSubscription = null
 let masterUpdateSubscription = null
+let epochStatusSubscription = null
+const epochRevokedVaultIds = new Set()
 
 /**
  * @param {object} instance
@@ -16,6 +18,8 @@ export const setPearpassVaultClient = (
   detachEnvelopeListener()
   detachNewListenerHook()
   detachMasterUpdateHook()
+  detachEpochStatusHook()
+  epochRevokedVaultIds.clear()
 
   pearpassVaultClient = instance
   currentDeviceNameValue = currentDeviceName ?? null
@@ -23,6 +27,7 @@ export const setPearpassVaultClient = (
   attachEnvelopeListener()
   attachNewListenerHook()
   attachMasterUpdateHook()
+  attachEpochStatusHook()
 }
 
 /**
@@ -116,5 +121,36 @@ const detachMasterUpdateHook = () => {
   masterUpdateSubscription = null
   if (sub && pearpassVaultClient?.off) {
     pearpassVaultClient.off('master-update', sub)
+  }
+}
+
+// Surface a revocation by key rotation (this device was left out of the
+// latest epoch) through the same event a kick envelope uses, once per vault.
+const attachEpochStatusHook = () => {
+  if (!pearpassVaultClient?.on) return
+  if (epochStatusSubscription) return
+
+  epochStatusSubscription = async (status) => {
+    if (status?.revoked !== true) return
+    try {
+      const vault = await pearpassVaultClient.activeVaultGet(`vault`)
+      const vaultId = vault?.id
+      if (!vaultId || epochRevokedVaultIds.has(vaultId)) return
+      epochRevokedVaultIds.add(vaultId)
+      pearpassVaultClient.emit('vault-access-revoked', {
+        vaultId,
+        actor: null,
+        reason: 'epoch'
+      })
+    } catch {}
+  }
+  pearpassVaultClient.on('epoch-status', epochStatusSubscription)
+}
+
+const detachEpochStatusHook = () => {
+  const sub = epochStatusSubscription
+  epochStatusSubscription = null
+  if (sub && pearpassVaultClient?.off) {
+    pearpassVaultClient.off('epoch-status', sub)
   }
 }

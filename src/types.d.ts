@@ -59,10 +59,21 @@ export interface EnsureEpochResult {
   uncovered: string[]
 }
 
+export interface EpochStatus {
+  epoch: string | null
+  seq: number
+  legacy: boolean
+  canRead: boolean
+  revoked: boolean
+  members: string[]
+  uncovered: string[]
+}
+
 export interface PearpassVaultEpochClient {
   activeVaultEnsureEpoch(_options: {
     start: boolean
   }): Promise<EnsureEpochResult>
+  activeVaultGetEpochStatus(): Promise<EpochStatus>
 }
 
 export interface KickDeviceResult extends BroadcastActionResult {

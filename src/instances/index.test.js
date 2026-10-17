@@ -103,4 +103,41 @@ describe('instance management functions', () => {
       expect.any(Function)
     )
   })
+
+  describe('epoch-status', () => {
+    const setup = () => {
+      const listeners = new Map()
+      const mockInstance = {
+        on: jest.fn((event, handler) => listeners.set(event, handler)),
+        off: jest.fn(),
+        emit: jest.fn(),
+        activeVaultGet: jest.fn().mockResolvedValue({ id: 'v1' })
+      }
+      setPearpassVaultClient(mockInstance)
+      return { mockInstance, fire: (s) => listeners.get('epoch-status')?.(s) }
+    }
+
+    test('emits vault-access-revoked once per vault when revoked', async () => {
+      const { mockInstance, fire } = setup()
+
+      await fire({ revoked: true, canRead: false })
+      await fire({ revoked: true, canRead: false })
+
+      expect(mockInstance.activeVaultGet).toHaveBeenCalledWith('vault')
+      expect(mockInstance.emit).toHaveBeenCalledTimes(1)
+      expect(mockInstance.emit).toHaveBeenCalledWith('vault-access-revoked', {
+        vaultId: 'v1',
+        actor: null,
+        reason: 'epoch'
+      })
+    })
+
+    test('emits nothing when not revoked', async () => {
+      const { mockInstance, fire } = setup()
+
+      await fire({ revoked: false, canRead: true })
+
+      expect(mockInstance.emit).not.toHaveBeenCalled()
+    })
+  })
 })
