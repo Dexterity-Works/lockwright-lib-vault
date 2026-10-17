@@ -13,7 +13,8 @@ import { logger } from '../utils/logger'
  * @param {{ vaultId: string, targetDeviceId: string }} params
  * @returns {Promise<{
  *   results: Array<{ targetDeviceId: string, channel: 'outbox' }>,
- *   failures: Array<{ targetDeviceId: string, error: Error }>
+ *   failures: Array<{ targetDeviceId: string, error: Error }>,
+ *   epoch: object | null
  * }>}
  */
 export const kickDevice = async ({ vaultId, targetDeviceId } = {}) => {
@@ -109,9 +110,38 @@ export const kickDevice = async ({ vaultId, targetDeviceId } = {}) => {
     )
     return {
       results: broadcastResult.results,
-      failures: [...broadcastResult.failures, { targetDeviceId, error }]
+      failures: [...broadcastResult.failures, { targetDeviceId, error }],
+      epoch: null
     }
   }
 
-  return broadcastResult
+  // 4. Rotate the vault key so the kicked device cannot read later writes.
+  //    A rotation that did not happen is reported, not thrown: the kick
+  //    itself already landed.
+  const failures = [...broadcastResult.failures]
+  let epoch = null
+  try {
+    epoch =
+      (await pearpassVaultClient.activeVaultEnsureEpoch({ start: true })) ??
+      null
+    if (epoch?.rotated === false && epoch.reason !== 'current') {
+      failures.push({
+        targetDeviceId,
+        error: new Error(`epoch rotation failed: ${epoch.reason}`)
+      })
+    }
+  } catch (error) {
+    logger.error('kickDevice: epoch rotation failed', {
+      err: error?.message ?? String(error)
+    })
+    failures.push({
+      targetDeviceId,
+      error: new Error(
+        `epoch rotation failed: ${error?.message ?? String(error)}`,
+        { cause: error }
+      )
+    })
+  }
+
+  return { results: broadcastResult.results, failures, epoch }
 }
