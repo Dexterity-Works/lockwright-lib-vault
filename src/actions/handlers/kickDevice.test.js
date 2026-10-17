@@ -50,4 +50,19 @@ describe('kickDeviceActionHandler', () => {
       { vaultId: 'v1', actor: 'A' }
     )
   })
+
+  it('emits once per vault and marks only on an actual emit', async () => {
+    const kick = {
+      payload: { vaultId: 'v-once', targetDeviceId: 'SELF' },
+      actor: 'A'
+    }
+    pearpassVaultClient.listenerCount.mockReturnValue(0)
+    await kickDeviceActionHandler.execute(kick)
+
+    pearpassVaultClient.listenerCount.mockReturnValue(1)
+    await kickDeviceActionHandler.execute(kick)
+    await kickDeviceActionHandler.execute(kick)
+
+    expect(pearpassVaultClient.emit).toHaveBeenCalledTimes(1)
+  })
 })

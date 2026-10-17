@@ -4,6 +4,7 @@ import {
   getCurrentDeviceName,
   setStoragePath
 } from './index'
+import { kickDeviceActionHandler } from '../actions/handlers/kickDevice'
 
 const mockRunActionScan = jest.fn().mockResolvedValue(undefined)
 jest.mock('../api/actionRunner.js', () => ({
@@ -112,7 +113,7 @@ describe('instance management functions', () => {
         off: jest.fn(),
         emit: jest.fn(),
         listenerCount: jest.fn().mockReturnValue(1),
-        activeVaultGet: jest.fn().mockResolvedValue({ id: 'v1' }),
+        activeVaultGet: jest.fn().mockResolvedValue({ id: 'other' }),
         activeVaultGetEpochStatus: jest.fn()
       }
       setPearpassVaultClient(mockInstance)
@@ -126,10 +127,9 @@ describe('instance management functions', () => {
     test('emits vault-access-revoked once per vault when revoked', async () => {
       const { mockInstance, fire } = setup()
 
-      await fire({ revoked: true, canRead: false })
-      await fire({ revoked: true, canRead: false })
+      await fire({ vaultId: 'v1', revoked: true, canRead: false })
+      await fire({ vaultId: 'v1', revoked: true, canRead: false })
 
-      expect(mockInstance.activeVaultGet).toHaveBeenCalledWith('vault')
       expect(mockInstance.emit).toHaveBeenCalledTimes(1)
       expect(mockInstance.emit).toHaveBeenCalledWith('vault-access-revoked', {
         vaultId: 'v1',
@@ -138,10 +138,45 @@ describe('instance management functions', () => {
       })
     })
 
+    test('ignores a status without a vaultId instead of guessing the active vault', async () => {
+      const { mockInstance, fire } = setup()
+
+      await fire({ revoked: true, canRead: false })
+
+      expect(mockInstance.activeVaultGet).not.toHaveBeenCalled()
+      expect(mockInstance.emit).not.toHaveBeenCalled()
+    })
+
+    test('emits again after a not-revoked status for the same vault', async () => {
+      const { mockInstance, fire } = setup()
+
+      await fire({ vaultId: 'v1', revoked: true, canRead: false })
+      await fire({ vaultId: 'v1', revoked: false, canRead: true })
+      await fire({ vaultId: 'v1', revoked: true, canRead: false })
+
+      expect(mockInstance.emit).toHaveBeenCalledTimes(2)
+    })
+
+    test('emits once per vault across a kick envelope and an epoch status', async () => {
+      const { mockInstance, fire } = setup()
+
+      await kickDeviceActionHandler.execute({
+        actor: 'A',
+        payload: { vaultId: 'v1', targetDeviceId: 'SELF' }
+      })
+      await fire({ vaultId: 'v1', revoked: true, canRead: false })
+
+      expect(mockInstance.emit).toHaveBeenCalledTimes(1)
+      expect(mockInstance.emit).toHaveBeenCalledWith('vault-access-revoked', {
+        vaultId: 'v1',
+        actor: 'A'
+      })
+    })
+
     test('emits nothing when not revoked', async () => {
       const { mockInstance, fire } = setup()
 
-      await fire({ revoked: false, canRead: true })
+      await fire({ vaultId: 'v1', revoked: false, canRead: true })
 
       expect(mockInstance.emit).not.toHaveBeenCalled()
     })
@@ -150,11 +185,11 @@ describe('instance management functions', () => {
       const { mockInstance, fire } = setup()
       mockInstance.listenerCount.mockReturnValue(0)
 
-      await fire({ revoked: true, canRead: false })
+      await fire({ vaultId: 'v1', revoked: true, canRead: false })
       expect(mockInstance.emit).not.toHaveBeenCalled()
 
       mockInstance.listenerCount.mockReturnValue(1)
-      await fire({ revoked: true, canRead: false })
+      await fire({ vaultId: 'v1', revoked: true, canRead: false })
 
       expect(mockInstance.emit).toHaveBeenCalledTimes(1)
       expect(mockInstance.emit).toHaveBeenCalledWith('vault-access-revoked', {
@@ -167,6 +202,7 @@ describe('instance management functions', () => {
     test('re-checks the epoch status when a revoked listener subscribes', async () => {
       const { mockInstance, subscribe } = setup()
       mockInstance.activeVaultGetEpochStatus.mockResolvedValue({
+        vaultId: 'v1',
         revoked: true,
         canRead: false
       })
@@ -186,6 +222,7 @@ describe('instance management functions', () => {
     test('emits nothing on subscribe when the status is not revoked', async () => {
       const { mockInstance, subscribe } = setup()
       mockInstance.activeVaultGetEpochStatus.mockResolvedValue({
+        vaultId: 'v1',
         revoked: false,
         canRead: true
       })

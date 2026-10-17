@@ -65,6 +65,7 @@ export interface EnsureEpochResult {
 }
 
 export interface EpochStatus {
+  vaultId: string
   epoch: string | null
   seq: number
   legacy: boolean

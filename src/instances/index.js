@@ -1,3 +1,10 @@
+import { logger } from '../utils/logger'
+import {
+  clearAllRevoked,
+  clearRevoked,
+  markRevoked
+} from '../utils/revocationGuard'
+
 export let pearpassVaultClient
 
 let currentDeviceNameValue = null
@@ -5,7 +12,6 @@ let envelopeSubscription = null
 let newListenerSubscription = null
 let masterUpdateSubscription = null
 let epochStatusSubscription = null
-const epochRevokedVaultIds = new Set()
 
 /**
  * @param {object} instance
@@ -19,7 +25,7 @@ export const setPearpassVaultClient = (
   detachNewListenerHook()
   detachMasterUpdateHook()
   detachEpochStatusHook()
-  epochRevokedVaultIds.clear()
+  clearAllRevoked()
 
   pearpassVaultClient = instance
   currentDeviceNameValue = currentDeviceName ?? null
@@ -89,7 +95,7 @@ const attachNewListenerHook = () => {
     } catch {}
     try {
       const status = await pearpassVaultClient.activeVaultGetEpochStatus?.()
-      await handleEpochStatus(status)
+      handleEpochStatus(status)
     } catch {}
   }
   pearpassVaultClient.on('newListener', newListenerSubscription)
@@ -131,13 +137,20 @@ const detachMasterUpdateHook = () => {
 // Surface a revocation by key rotation (this device was left out of the
 // latest epoch) through the same event a kick envelope uses, once per vault.
 // With no listener yet, record nothing: the newListener hook re-checks.
-const handleEpochStatus = async (status) => {
-  if (status?.revoked !== true) return
-  const vault = await pearpassVaultClient.activeVaultGet(`vault`)
-  const vaultId = vault?.id
-  if (!vaultId || epochRevokedVaultIds.has(vaultId)) return
+const handleEpochStatus = (status) => {
+  if (!status) return
+  const { vaultId } = status
+  if (!vaultId) {
+    logger.error('epoch-status: status has no vaultId; ignoring')
+    return
+  }
+  if (status.revoked === false) {
+    clearRevoked(vaultId)
+    return
+  }
+  if (status.revoked !== true) return
   if (!(pearpassVaultClient.listenerCount?.('vault-access-revoked') > 0)) return
-  epochRevokedVaultIds.add(vaultId)
+  if (!markRevoked(vaultId)) return
   pearpassVaultClient.emit('vault-access-revoked', {
     vaultId,
     actor: null,
@@ -151,7 +164,7 @@ const attachEpochStatusHook = () => {
 
   epochStatusSubscription = async (status) => {
     try {
-      await handleEpochStatus(status)
+      handleEpochStatus(status)
     } catch {}
   }
   pearpassVaultClient.on('epoch-status', epochStatusSubscription)
