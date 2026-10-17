@@ -29,7 +29,12 @@ export const leaveVaultActionHandler = {
     // Sweep from the peer record so late duplicates still go, then rotate,
     // or the inbox drops the entry and the leaver keeps reading.
     const primary = actorDevice ?? (await peerRecord(actorId))
-    await sweepDeviceRows({ primary, devices, myWriterKey })
+    await sweepDeviceRows({
+      primary,
+      devices,
+      myWriterKey,
+      topicMatchApplies: createdBefore(Date.parse(action?.sentAt))
+    })
 
     const epoch = await pearpassVaultClient.activeVaultEnsureEpoch({
       start: true
@@ -48,6 +53,16 @@ export const leaveVaultActionHandler = {
     )
   }
 }
+
+// A leave processed late (leaver offline, or deferred while the vault was
+// not active) must not sweep the leaver's re-join: a fresh row with a new
+// writerKey and the same masterTopic. Only rows created before the leave
+// was sent match by masterTopic. With no valid sentAt this matches nothing,
+// so the sweep falls back to writerKey matches only.
+const createdBefore = (sentAtMs) => (row) =>
+  Number.isFinite(sentAtMs) &&
+  Number.isFinite(row?.createdAt) &&
+  row.createdAt < sentAtMs
 
 const peerRecord = async (actorId) => {
   const peer = await pearpassVaultClient.vaultsGet?.(`peer/${actorId}`)

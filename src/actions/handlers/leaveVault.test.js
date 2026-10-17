@@ -8,7 +8,15 @@ jest.mock('../../api/getCurrentVault', () => ({ getCurrentVault: jest.fn() }))
 jest.mock('../../api/listDevices', () => ({ listDevices: jest.fn() }))
 
 describe('leaveVaultActionHandler', () => {
-  const leave = { type: 'leave-vault', actor: 'B', payload: { vaultId: 'v1' } }
+  const SENT_AT = '2026-10-01T00:00:00.000Z'
+  const BEFORE = Date.parse(SENT_AT) - 1000
+  const AFTER = Date.parse(SENT_AT) + 1000
+  const leave = {
+    type: 'leave-vault',
+    actor: 'B',
+    sentAt: SENT_AT,
+    payload: { vaultId: 'v1' }
+  }
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -105,7 +113,12 @@ describe('leaveVaultActionHandler', () => {
       { id: 'A', writerKey: 'writer-A', masterTopic: 't-a' },
       { id: 'B', writerKey: 'writer-B', masterTopic: 't-b' },
       { id: 'B2', writerKey: 'writer-B' },
-      { id: 'B3', writerKey: 'writer-B3', masterTopic: 't-b' },
+      {
+        id: 'B3',
+        writerKey: 'writer-B3',
+        masterTopic: 't-b',
+        createdAt: BEFORE
+      },
       { id: 'C', writerKey: 'writer-C', masterTopic: 't-c' }
     ])
     const calls = []
@@ -129,6 +142,56 @@ describe('leaveVaultActionHandler', () => {
     ])
     expect(calls.at(-1)).toEqual(['remove', 'device/B'])
   })
+
+  it('keeps a row sharing the leaver masterTopic that was created after the leave was sent', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'A', writerKey: 'writer-A' },
+      { id: 'B', writerKey: 'writer-B', masterTopic: 't-b', createdAt: BEFORE },
+      {
+        id: 'B-new',
+        writerKey: 'writer-B-new',
+        masterTopic: 't-b',
+        createdAt: AFTER
+      }
+    ])
+
+    await leaveVaultActionHandler.execute(leave)
+
+    expect(pearpassVaultClient.activeVaultRemove).toHaveBeenCalledTimes(1)
+    expect(pearpassVaultClient.activeVaultRemove).toHaveBeenCalledWith(
+      'device/B'
+    )
+    expect(
+      pearpassVaultClient.activeVaultRemoveWriter
+    ).not.toHaveBeenCalledWith('writer-B-new')
+    expect(pearpassVaultClient.activeVaultEnsureEpoch).toHaveBeenCalledWith({
+      start: true
+    })
+  })
+
+  it.each([[undefined], ['not a date']])(
+    'matches by writerKey only when sentAt is %p',
+    async (sentAt) => {
+      listDevices.mockResolvedValue([
+        { id: 'A', writerKey: 'writer-A' },
+        { id: 'B', writerKey: 'writer-B', masterTopic: 't-b' },
+        { id: 'B2', writerKey: 'writer-B' },
+        {
+          id: 'B3',
+          writerKey: 'writer-B3',
+          masterTopic: 't-b',
+          createdAt: BEFORE
+        }
+      ])
+
+      await leaveVaultActionHandler.execute({ ...leave, sentAt })
+
+      const removed = pearpassVaultClient.activeVaultRemove.mock.calls.map(
+        ([k]) => k
+      )
+      expect(removed.sort()).toEqual(['device/B', 'device/B2'])
+    }
+  )
 
   it('keeps the actor row for the retry when a duplicate delete throws', async () => {
     listDevices.mockResolvedValue([
@@ -306,7 +369,12 @@ describe('leaveVaultActionHandler', () => {
         // A stale row for the leaver replicates in after the first sweep.
         roster = [
           ...roster,
-          { id: 'B-old', writerKey: 'writer-B-old', masterTopic: 't-b' }
+          {
+            id: 'B-old',
+            writerKey: 'writer-B-old',
+            masterTopic: 't-b',
+            createdAt: BEFORE
+          }
         ]
         throw new Error('rotation failed')
       })
@@ -326,5 +394,37 @@ describe('leaveVaultActionHandler', () => {
       ['ensureEpoch']
     ])
     expect(record).toBeNull()
+  })
+
+  it('keeps a re-join row created after sentAt on the peer-record retry path', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'A', writerKey: 'writer-A' },
+      {
+        id: 'B-old',
+        writerKey: 'writer-B-old',
+        masterTopic: 't-b',
+        createdAt: BEFORE
+      },
+      {
+        id: 'B-new',
+        writerKey: 'writer-B-new',
+        masterTopic: 't-b',
+        createdAt: AFTER
+      }
+    ])
+    pearpassVaultClient.vaultsGet.mockImplementation(async (key) =>
+      key === 'peer/B'
+        ? { id: 'B', writerKey: 'writer-B', masterTopic: 't-b' }
+        : undefined
+    )
+
+    await leaveVaultActionHandler.execute(leave)
+
+    expect(pearpassVaultClient.activeVaultRemove.mock.calls).toEqual([
+      ['device/B-old']
+    ])
+    expect(pearpassVaultClient.activeVaultRemoveWriter.mock.calls).toEqual([
+      ['writer-B-old']
+    ])
   })
 })

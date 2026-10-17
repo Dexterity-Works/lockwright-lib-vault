@@ -15,17 +15,28 @@ import { pearpassVaultClient } from '../instances'
  * The primary need not be in `devices` (a retry after its row was dropped
  * passes the peer record); then only the duplicates are swept.
  *
+ * `topicMatchApplies(row)` narrows masterTopic matches (writerKey matches
+ * are always swept); by default every masterTopic match is swept.
+ *
  * @param {{
  *   primary: { id: string, writerKey?: string | null, masterTopic?: string | null },
  *   devices: Array<{ id?: string, writerKey?: string | null, masterTopic?: string | null }>,
- *   myWriterKey: string | null
+ *   myWriterKey: string | null,
+ *   topicMatchApplies?: (row: { createdAt?: number }) => boolean
  * }} params
  */
-export const sweepDeviceRows = async ({ primary, devices, myWriterKey }) => {
+export const sweepDeviceRows = async ({
+  primary,
+  devices,
+  myWriterKey,
+  topicMatchApplies = () => true
+}) => {
   const isOwn = (d) => !!myWriterKey && d.writerKey === myWriterKey
   const matches = (d) =>
     (!!primary.writerKey && d.writerKey === primary.writerKey) ||
-    (!!primary.masterTopic && d.masterTopic === primary.masterTopic)
+    (!!primary.masterTopic &&
+      d.masterTopic === primary.masterTopic &&
+      topicMatchApplies(d))
 
   const primaryRow = devices.find((d) => d?.id === primary.id)
   const duplicates = devices.filter(
