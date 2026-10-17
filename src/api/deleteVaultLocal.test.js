@@ -3,6 +3,7 @@ import { pearpassVaultClient } from '../instances'
 import { broadcastAction } from './broadcastAction'
 import { deleteVaultLocal } from './deleteVaultLocal'
 import { listVaults } from './listVaults'
+import { kickDeviceActionHandler } from '../actions/handlers/kickDevice'
 import { getMyDeviceId } from '../utils/getMyDeviceId'
 
 jest.mock('./listVaults', () => ({
@@ -87,5 +88,23 @@ describe('deleteVaultLocal', () => {
 
     expect(broadcastAction).not.toHaveBeenCalled()
     expect(pearpassVaultClient.removeVault).toHaveBeenCalledWith('v1')
+  })
+
+  it('lets a re-paired vault be revoked again after the wipe', async () => {
+    pearpassVaultClient.listenerCount.mockReturnValue(1)
+    const kick = {
+      actor: 'A',
+      payload: { vaultId: 'v-repair', targetDeviceId: 'SELF' }
+    }
+
+    await kickDeviceActionHandler.execute(kick)
+    await deleteVaultLocal('v-repair')
+    await kickDeviceActionHandler.execute(kick)
+
+    expect(
+      pearpassVaultClient.emit.mock.calls.filter(
+        ([event]) => event === 'vault-access-revoked'
+      )
+    ).toHaveLength(2)
   })
 })

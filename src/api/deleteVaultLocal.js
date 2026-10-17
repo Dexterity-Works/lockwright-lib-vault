@@ -4,6 +4,7 @@ import { broadcastAction } from './broadcastAction'
 import { listVaults } from './listVaults'
 import { getMyDeviceId } from '../utils/getMyDeviceId'
 import { logger } from '../utils/logger'
+import { clearRevoked } from '../utils/revocationGuard'
 
 /**
  * Removes a vault from this device. Before wiping locally, broadcasts a
@@ -39,6 +40,7 @@ export const deleteVaultLocal = async (vaultId) => {
   }
 
   await pearpassVaultClient.removeVault(vaultId)
+  clearRevoked(vaultId)
 
   return listVaults()
 }

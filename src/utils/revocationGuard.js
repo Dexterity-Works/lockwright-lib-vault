@@ -16,14 +16,17 @@ export const markRevoked = (vaultId, source) => {
 }
 
 /**
- * Clear a mark left by `source` only. A not-revoked epoch status must not
- * undo a kick: the kick envelope is the stronger signal.
+ * With a `source`, clear only a mark that source left: a not-revoked epoch
+ * status must not undo a kick, the kick envelope is the stronger signal.
+ * Without one, clear any mark: the vault was wiped, paired, or created, so
+ * a later revocation is a new one.
  *
  * @param {string} vaultId
- * @param {'kick' | 'epoch'} source
+ * @param {'kick' | 'epoch'} [source]
  */
 export const clearRevoked = (vaultId, source) => {
-  if (revokedVaultIds.get(vaultId) === source) revokedVaultIds.delete(vaultId)
+  if (source && revokedVaultIds.get(vaultId) !== source) return
+  revokedVaultIds.delete(vaultId)
 }
 
 export const clearAllRevoked = () => {

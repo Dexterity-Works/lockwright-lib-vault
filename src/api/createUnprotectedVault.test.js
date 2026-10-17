@@ -1,6 +1,7 @@
 import { createUnprotectedVault } from './createUnprotectedVault'
 import { pearpassVaultClient } from '../instances'
 import { getMasterPasswordEncryption } from './getMasterPasswordEncryption'
+import { markRevoked } from '../utils/revocationGuard'
 
 jest.mock('./getMasterPasswordEncryption', () => ({
   getMasterPasswordEncryption: jest.fn()
@@ -111,6 +112,7 @@ describe('createUnprotectedVault', () => {
     pearpassVaultClient.decryptVaultKey.mockResolvedValue('decrypted-key')
 
     const vault = { id: 'complex-vault-id', name: 'Test Vault' }
+    markRevoked(vault.id, 'kick')
 
     await createUnprotectedVault(vault)
 
@@ -118,6 +120,7 @@ describe('createUnprotectedVault', () => {
       `vault/${vault.id}`,
       vault
     )
+    expect(markRevoked(vault.id, 'kick')).toBe(true)
   })
 
   it('should handle encryption when vault has password', async () => {
