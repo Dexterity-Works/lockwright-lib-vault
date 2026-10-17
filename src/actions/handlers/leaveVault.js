@@ -44,5 +44,9 @@ export const leaveVaultActionHandler = {
     }
 
     await pearpassVaultClient.activeVaultRemove(`device/${actorId}`)
+
+    // Rotate the vault key so the leaver cannot read later writes. A throw
+    // propagates and the inbox retries.
+    await pearpassVaultClient.activeVaultEnsureEpoch({ start: true })
   }
 }

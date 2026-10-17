@@ -13,6 +13,8 @@ describe('leaveVaultActionHandler', () => {
     jest.clearAllMocks()
     getCurrentVault.mockResolvedValue({ id: 'v1' })
     pearpassVaultClient.activeVaultGetWriterKey.mockResolvedValue('writer-A')
+    pearpassVaultClient.activeVaultRemoveWriter.mockResolvedValue(undefined)
+    pearpassVaultClient.activeVaultRemove.mockResolvedValue(undefined)
   })
 
   it('revokes the leaver as a writer before dropping its device row', async () => {
@@ -56,6 +58,43 @@ describe('leaveVaultActionHandler', () => {
     expect(pearpassVaultClient.activeVaultRemoveWriter).not.toHaveBeenCalled()
     expect(pearpassVaultClient.activeVaultRemove).toHaveBeenCalledWith(
       'device/B'
+    )
+  })
+
+  it('rotates the epoch after dropping the device row', async () => {
+    listDevices.mockResolvedValue([{ id: 'B', writerKey: 'writer-B' }])
+    const calls = []
+    pearpassVaultClient.activeVaultRemove.mockImplementation(async (k) =>
+      calls.push(['remove', k])
+    )
+    pearpassVaultClient.activeVaultEnsureEpoch.mockImplementation(async (o) =>
+      calls.push(['ensureEpoch', o])
+    )
+
+    await leaveVaultActionHandler.execute(leave)
+
+    expect(calls).toEqual([
+      ['remove', 'device/B'],
+      ['ensureEpoch', { start: true }]
+    ])
+  })
+
+  it('does not rotate when the actor row is missing', async () => {
+    listDevices.mockResolvedValue([{ id: 'A', writerKey: 'writer-A' }])
+
+    await leaveVaultActionHandler.execute(leave)
+
+    expect(pearpassVaultClient.activeVaultEnsureEpoch).not.toHaveBeenCalled()
+  })
+
+  it('lets a rotation failure propagate so the inbox retries', async () => {
+    listDevices.mockResolvedValue([{ id: 'B', writerKey: 'writer-B' }])
+    pearpassVaultClient.activeVaultEnsureEpoch.mockRejectedValueOnce(
+      new Error('rotation failed')
+    )
+
+    await expect(leaveVaultActionHandler.execute(leave)).rejects.toThrow(
+      'rotation failed'
     )
   })
 })
