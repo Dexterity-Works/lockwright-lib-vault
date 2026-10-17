@@ -173,6 +173,19 @@ describe('instance management functions', () => {
       })
     })
 
+    test('keeps a kick mark through a not-revoked status', async () => {
+      const { mockInstance, fire } = setup()
+
+      await kickDeviceActionHandler.execute({
+        actor: 'A',
+        payload: { vaultId: 'v1', targetDeviceId: 'SELF' }
+      })
+      await fire({ vaultId: 'v1', revoked: false, canRead: true })
+      await fire({ vaultId: 'v1', revoked: true, canRead: false })
+
+      expect(mockInstance.emit).toHaveBeenCalledTimes(1)
+    })
+
     test('emits nothing when not revoked', async () => {
       const { mockInstance, fire } = setup()
 

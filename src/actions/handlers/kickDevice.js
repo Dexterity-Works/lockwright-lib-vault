@@ -25,7 +25,7 @@ export const kickDeviceActionHandler = {
     if (pearpassVaultClient.listenerCount?.('vault-access-revoked') === 0) {
       return { status: 'deferred', reason: 'no-listener' }
     }
-    if (!markRevoked(vaultId)) return
+    if (!markRevoked(vaultId, 'kick')) return
     pearpassVaultClient.emit('vault-access-revoked', {
       vaultId,
       actor: action?.actor

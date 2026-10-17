@@ -145,12 +145,12 @@ const handleEpochStatus = (status) => {
     return
   }
   if (status.revoked === false) {
-    clearRevoked(vaultId)
+    clearRevoked(vaultId, 'epoch')
     return
   }
   if (status.revoked !== true) return
   if (!(pearpassVaultClient.listenerCount?.('vault-access-revoked') > 0)) return
-  if (!markRevoked(vaultId)) return
+  if (!markRevoked(vaultId, 'epoch')) return
   pearpassVaultClient.emit('vault-access-revoked', {
     vaultId,
     actor: null,

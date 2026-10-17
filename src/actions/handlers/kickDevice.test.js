@@ -1,8 +1,10 @@
 import { kickDeviceActionHandler } from './kickDevice'
 import { pearpassVaultClient } from '../../instances'
+import { clearAllRevoked } from '../../utils/revocationGuard'
 
 describe('kickDeviceActionHandler', () => {
   beforeEach(() => {
+    clearAllRevoked()
     pearpassVaultClient.listenerCount.mockReset()
     pearpassVaultClient.emit.mockReset()
   })
