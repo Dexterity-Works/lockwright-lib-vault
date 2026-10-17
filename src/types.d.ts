@@ -55,7 +55,12 @@ export interface EnsureEpochResult {
   id?: string
   seq?: number
   members?: string[]
-  reason?: 'current' | 'legacy' | 'not-writable' | 'self-not-in-roster'
+  reason?:
+    | 'current'
+    | 'pending'
+    | 'legacy'
+    | 'not-writable'
+    | 'self-not-in-roster'
   uncovered: string[]
 }
 
