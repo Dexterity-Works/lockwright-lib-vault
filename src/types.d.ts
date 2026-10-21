@@ -49,3 +49,51 @@ export declare function deleteVaultLocal(
 export declare function runActionScan(): Promise<void>
 
 export declare function getMyDeviceId(): Promise<string | null>
+
+export interface EnsureEpochResult {
+  rotated: boolean
+  id?: string
+  seq?: number
+  members?: string[]
+  reason?:
+    | 'current'
+    | 'pending'
+    | 'legacy'
+    | 'not-writable'
+    | 'self-not-in-roster'
+  uncovered: string[]
+}
+
+export interface EpochStatus {
+  vaultId: string
+  epoch: string | null
+  seq: number
+  legacy: boolean
+  canRead: boolean
+  revoked: boolean
+  members: string[]
+  uncovered: string[]
+}
+
+export interface PearpassVaultEpochClient {
+  activeVaultEnsureEpoch(_options: {
+    start: boolean
+  }): Promise<EnsureEpochResult>
+  activeVaultGetEpochStatus(): Promise<EpochStatus>
+}
+
+export declare const EPOCH_FAILURE_KIND: 'epoch'
+
+export interface KickDeviceResult extends BroadcastActionResult {
+  failures: Array<{
+    targetDeviceId: string
+    error: Error
+    kind?: typeof EPOCH_FAILURE_KIND
+  }>
+  epoch: EnsureEpochResult | null
+}
+
+export declare function kickDevice(_params: {
+  vaultId: string
+  targetDeviceId: string
+}): Promise<KickDeviceResult>

@@ -11,7 +11,7 @@ jest.mock('../actions', () => ({
 }))
 
 import { broadcastAction } from './broadcastAction'
-import { kickDevice } from './kickDevice'
+import { EPOCH_FAILURE_KIND, kickDevice } from './kickDevice'
 import { listDevices } from './listDevices'
 import { pearpassVaultClient } from '../instances'
 
@@ -26,6 +26,14 @@ describe('kickDevice', () => {
     pearpassVaultClient.activeVaultRemoveWriter.mockResolvedValue(undefined)
     pearpassVaultClient.activeVaultRemove.mockReset()
     pearpassVaultClient.activeVaultRemove.mockResolvedValue(undefined)
+    pearpassVaultClient.activeVaultEnsureEpoch.mockReset()
+    pearpassVaultClient.activeVaultEnsureEpoch.mockResolvedValue({
+      rotated: true,
+      id: 'e2',
+      seq: 2,
+      members: ['SELF'],
+      uncovered: []
+    })
   })
 
   it('rejects when vaultId is missing', async () => {
@@ -189,4 +197,203 @@ describe('kickDevice', () => {
     )
     expect(result.failures).toEqual([{ targetDeviceId: 'B', error: boom }])
   })
+
+  it('rotates the epoch after the roster rows are gone and returns the result', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', writerKey: 'w-self' },
+      { id: 'B', writerKey: 'w-b' }
+    ])
+    const callOrder = []
+    pearpassVaultClient.activeVaultRemove.mockImplementation(async () => {
+      callOrder.push('removeEntry')
+    })
+    pearpassVaultClient.activeVaultEnsureEpoch.mockImplementation(async () => {
+      callOrder.push('ensureEpoch')
+      return {
+        rotated: true,
+        id: 'e2',
+        seq: 2,
+        members: ['SELF'],
+        uncovered: []
+      }
+    })
+
+    const result = await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+    expect(callOrder).toEqual(['removeEntry', 'ensureEpoch'])
+    expect(pearpassVaultClient.activeVaultEnsureEpoch).toHaveBeenCalledWith({
+      start: true
+    })
+    expect(result).toEqual({
+      results: [],
+      failures: [],
+      epoch: {
+        rotated: true,
+        id: 'e2',
+        seq: 2,
+        members: ['SELF'],
+        uncovered: []
+      }
+    })
+  })
+
+  it('reports a rotation that did not happen as a failure', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', writerKey: 'w-self' },
+      { id: 'B', writerKey: 'w-b' }
+    ])
+    const epoch = {
+      rotated: false,
+      reason: 'self-not-in-roster',
+      uncovered: []
+    }
+    pearpassVaultClient.activeVaultEnsureEpoch.mockResolvedValue(epoch)
+
+    const result = await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+    expect(result.epoch).toEqual(epoch)
+    expect(result.failures).toHaveLength(1)
+    expect(result.failures[0].targetDeviceId).toBe('B')
+    expect(result.failures[0].kind).toBe(EPOCH_FAILURE_KIND)
+    expect(result.failures[0].error.message).toBe(
+      'epoch rotation failed: self-not-in-roster'
+    )
+  })
+
+  it('does not report a rotation left to another member as a failure', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', writerKey: 'w-self' },
+      { id: 'B', writerKey: 'w-b' }
+    ])
+    pearpassVaultClient.activeVaultEnsureEpoch.mockResolvedValue({
+      rotated: false,
+      reason: 'pending',
+      uncovered: []
+    })
+
+    const result = await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+    expect(result.failures).toEqual([])
+  })
+
+  it('does not report an already current epoch as a failure', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', writerKey: 'w-self' },
+      { id: 'B', writerKey: 'w-b' }
+    ])
+    pearpassVaultClient.activeVaultEnsureEpoch.mockResolvedValue({
+      rotated: false,
+      reason: 'current',
+      uncovered: []
+    })
+
+    const result = await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+    expect(result.failures).toEqual([])
+  })
+
+  it('keeps earlier results and records a failure when rotation throws', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', writerKey: 'w-self' },
+      { id: 'B', writerKey: 'w-b' }
+    ])
+    const delivered = { targetDeviceId: 'B', channel: 'outbox' }
+    broadcastAction.mockResolvedValue({ results: [delivered], failures: [] })
+    pearpassVaultClient.activeVaultEnsureEpoch.mockRejectedValue(
+      new Error('Not writable')
+    )
+
+    const result = await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+    expect(result.results).toEqual([delivered])
+    expect(result.epoch).toBeNull()
+    expect(result.failures).toHaveLength(1)
+    expect(result.failures[0].kind).toBe('epoch')
+    expect(result.failures[0].error.message).toBe(
+      'epoch rotation failed: Not writable'
+    )
+  })
+
+  it('skips rotation and returns a null epoch when the roster removal fails', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', writerKey: 'w-self' },
+      { id: 'B', writerKey: 'w-b' }
+    ])
+    pearpassVaultClient.activeVaultRemove.mockRejectedValue(new Error('boom'))
+
+    const result = await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+    expect(pearpassVaultClient.activeVaultEnsureEpoch).not.toHaveBeenCalled()
+    expect(result.epoch).toBeNull()
+  })
+
+  it('sweeps rows sharing a writerKey or masterTopic, revoking every swept writer first and the primary row last', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', writerKey: 'w-self', masterTopic: 't-self' },
+      { id: 'B', writerKey: 'w-b', masterTopic: 't-b' },
+      { id: 'B2', writerKey: 'w-b2', masterTopic: 't-b' },
+      { id: 'B3', writerKey: 'w-b' },
+      { id: 'S2', writerKey: 'w-self', masterTopic: 't-b' },
+      { id: 'C', writerKey: 'w-c', masterTopic: 't-c' }
+    ])
+    const calls = []
+    pearpassVaultClient.activeVaultRemoveWriter.mockImplementation(async (k) =>
+      calls.push(['removeWriter', k])
+    )
+    pearpassVaultClient.activeVaultRemove.mockImplementation(async (k) =>
+      calls.push(['remove', k])
+    )
+
+    await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+    const writers = calls.filter(([op]) => op === 'removeWriter')
+    const removes = calls.filter(([op]) => op === 'remove')
+    expect(writers.map(([, k]) => k).sort()).toEqual(['w-b', 'w-b2'])
+    expect(calls.slice(0, writers.length)).toEqual(writers)
+    expect(removes.map(([, k]) => k).sort()).toEqual([
+      'device/B',
+      'device/B2',
+      'device/B3'
+    ])
+    expect(calls.at(-1)).toEqual(['remove', 'device/B'])
+  })
+
+  it('leaves the primary row for a retry when a duplicate delete throws', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', writerKey: 'w-self' },
+      { id: 'B', writerKey: 'w-b' },
+      { id: 'B2', writerKey: 'w-b' }
+    ])
+    const boom = new Error('remove failed')
+    pearpassVaultClient.activeVaultRemove.mockImplementation(async (k) => {
+      if (k === 'device/B2') throw boom
+    })
+
+    const result = await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+    expect(pearpassVaultClient.activeVaultRemove).not.toHaveBeenCalledWith(
+      'device/B'
+    )
+    expect(result.failures).toEqual([{ targetDeviceId: 'B', error: boom }])
+    expect(pearpassVaultClient.activeVaultEnsureEpoch).not.toHaveBeenCalled()
+  })
+
+  it.each([[undefined], [null], [{ uncovered: [] }]])(
+    'reports a rotation with no usable result (%p) as an epoch failure',
+    async (epochResult) => {
+      listDevices.mockResolvedValue([
+        { id: 'SELF', writerKey: 'w-self' },
+        { id: 'B', writerKey: 'w-b' }
+      ])
+      pearpassVaultClient.activeVaultEnsureEpoch.mockResolvedValue(epochResult)
+
+      const result = await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+      expect(result.failures).toHaveLength(1)
+      expect(result.failures[0].kind).toBe(EPOCH_FAILURE_KIND)
+      expect(result.failures[0].error.message).toBe(
+        'epoch rotation failed: no result'
+      )
+    }
+  )
 })

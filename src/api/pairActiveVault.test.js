@@ -2,6 +2,7 @@ import { pairActiveVault } from './pairActiveVault'
 import { pearpassVaultClient } from '../instances'
 import { getMasterPasswordEncryption } from './getMasterPasswordEncryption'
 import { listVaults } from './listVaults'
+import { markRevoked } from '../utils/revocationGuard'
 
 jest.mock('../instances', () => ({
   pearpassVaultClient: {
@@ -74,6 +75,14 @@ describe('pairActiveVault', () => {
       mockVault
     )
     expect(result).toBe(mockVaultId)
+  })
+
+  it('clears an old revocation mark for the paired vault id', async () => {
+    markRevoked(mockVaultId, 'kick')
+
+    await pairActiveVault(mockInviteCode)
+
+    expect(markRevoked(mockVaultId, 'kick')).toBe(true)
   })
 
   it('keeps a protected vault KEK out of the master catalog', async () => {

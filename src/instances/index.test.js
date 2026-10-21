@@ -4,6 +4,7 @@ import {
   getCurrentDeviceName,
   setStoragePath
 } from './index'
+import { kickDeviceActionHandler } from '../actions/handlers/kickDevice'
 
 const mockRunActionScan = jest.fn().mockResolvedValue(undefined)
 jest.mock('../api/actionRunner.js', () => ({
@@ -102,5 +103,147 @@ describe('instance management functions', () => {
       'master-update',
       expect.any(Function)
     )
+  })
+
+  describe('epoch-status', () => {
+    const setup = () => {
+      const listeners = new Map()
+      const mockInstance = {
+        on: jest.fn((event, handler) => listeners.set(event, handler)),
+        off: jest.fn(),
+        emit: jest.fn(),
+        listenerCount: jest.fn().mockReturnValue(1),
+        activeVaultGet: jest.fn().mockResolvedValue({ id: 'other' }),
+        activeVaultGetEpochStatus: jest.fn()
+      }
+      setPearpassVaultClient(mockInstance)
+      return {
+        mockInstance,
+        fire: (s) => listeners.get('epoch-status')?.(s),
+        subscribe: (event) => listeners.get('newListener')?.(event)
+      }
+    }
+
+    test('emits vault-access-revoked once per vault when revoked', async () => {
+      const { mockInstance, fire } = setup()
+
+      await fire({ vaultId: 'v1', revoked: true, canRead: false })
+      await fire({ vaultId: 'v1', revoked: true, canRead: false })
+
+      expect(mockInstance.emit).toHaveBeenCalledTimes(1)
+      expect(mockInstance.emit).toHaveBeenCalledWith('vault-access-revoked', {
+        vaultId: 'v1',
+        actor: null,
+        reason: 'epoch'
+      })
+    })
+
+    test('ignores a status without a vaultId instead of guessing the active vault', async () => {
+      const { mockInstance, fire } = setup()
+
+      await fire({ revoked: true, canRead: false })
+
+      expect(mockInstance.activeVaultGet).not.toHaveBeenCalled()
+      expect(mockInstance.emit).not.toHaveBeenCalled()
+    })
+
+    test('emits again after a not-revoked status for the same vault', async () => {
+      const { mockInstance, fire } = setup()
+
+      await fire({ vaultId: 'v1', revoked: true, canRead: false })
+      await fire({ vaultId: 'v1', revoked: false, canRead: true })
+      await fire({ vaultId: 'v1', revoked: true, canRead: false })
+
+      expect(mockInstance.emit).toHaveBeenCalledTimes(2)
+    })
+
+    test('emits once per vault across a kick envelope and an epoch status', async () => {
+      const { mockInstance, fire } = setup()
+
+      await kickDeviceActionHandler.execute({
+        actor: 'A',
+        payload: { vaultId: 'v1', targetDeviceId: 'SELF' }
+      })
+      await fire({ vaultId: 'v1', revoked: true, canRead: false })
+
+      expect(mockInstance.emit).toHaveBeenCalledTimes(1)
+      expect(mockInstance.emit).toHaveBeenCalledWith('vault-access-revoked', {
+        vaultId: 'v1',
+        actor: 'A'
+      })
+    })
+
+    test('keeps a kick mark through a not-revoked status', async () => {
+      const { mockInstance, fire } = setup()
+
+      await kickDeviceActionHandler.execute({
+        actor: 'A',
+        payload: { vaultId: 'v1', targetDeviceId: 'SELF' }
+      })
+      await fire({ vaultId: 'v1', revoked: false, canRead: true })
+      await fire({ vaultId: 'v1', revoked: true, canRead: false })
+
+      expect(mockInstance.emit).toHaveBeenCalledTimes(1)
+    })
+
+    test('emits nothing when not revoked', async () => {
+      const { mockInstance, fire } = setup()
+
+      await fire({ vaultId: 'v1', revoked: false, canRead: true })
+
+      expect(mockInstance.emit).not.toHaveBeenCalled()
+    })
+
+    test('holds a revocation until a vault-access-revoked listener exists', async () => {
+      const { mockInstance, fire } = setup()
+      mockInstance.listenerCount.mockReturnValue(0)
+
+      await fire({ vaultId: 'v1', revoked: true, canRead: false })
+      expect(mockInstance.emit).not.toHaveBeenCalled()
+
+      mockInstance.listenerCount.mockReturnValue(1)
+      await fire({ vaultId: 'v1', revoked: true, canRead: false })
+
+      expect(mockInstance.emit).toHaveBeenCalledTimes(1)
+      expect(mockInstance.emit).toHaveBeenCalledWith('vault-access-revoked', {
+        vaultId: 'v1',
+        actor: null,
+        reason: 'epoch'
+      })
+    })
+
+    test('re-checks the epoch status when a revoked listener subscribes', async () => {
+      const { mockInstance, subscribe } = setup()
+      mockInstance.activeVaultGetEpochStatus.mockResolvedValue({
+        vaultId: 'v1',
+        revoked: true,
+        canRead: false
+      })
+
+      await subscribe('vault-access-revoked')
+      await subscribe('vault-access-revoked')
+
+      expect(mockInstance.activeVaultGetEpochStatus).toHaveBeenCalled()
+      expect(mockInstance.emit).toHaveBeenCalledTimes(1)
+      expect(mockInstance.emit).toHaveBeenCalledWith('vault-access-revoked', {
+        vaultId: 'v1',
+        actor: null,
+        reason: 'epoch'
+      })
+    })
+
+    test('emits nothing on subscribe when the status is not revoked', async () => {
+      const { mockInstance, subscribe } = setup()
+      mockInstance.activeVaultGetEpochStatus.mockResolvedValue({
+        vaultId: 'v1',
+        revoked: false,
+        canRead: true
+      })
+
+      await subscribe('vault-access-revoked')
+
+      expect(mockInstance.activeVaultGetEpochStatus).toHaveBeenCalled()
+      expect(mockInstance.emit).not.toHaveBeenCalled()
+    })
   })
 })
