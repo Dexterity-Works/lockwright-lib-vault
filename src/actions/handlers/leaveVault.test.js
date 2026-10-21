@@ -169,6 +169,54 @@ describe('leaveVaultActionHandler', () => {
     })
   })
 
+  // Known residual: the actor row is swept with no createdAt check, so a
+  // re-join that the by-name heal wrote back under the old id still goes.
+  it('sweeps a same-name re-join the heal wrote under the leaver id', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'A', writerKey: 'writer-A' },
+      {
+        id: 'B',
+        writerKey: 'writer-B-new',
+        masterTopic: 't-b',
+        createdAt: AFTER
+      }
+    ])
+
+    await leaveVaultActionHandler.execute(leave)
+
+    expect(pearpassVaultClient.activeVaultRemoveWriter.mock.calls).toEqual([
+      ['writer-B-new']
+    ])
+    expect(pearpassVaultClient.activeVaultRemove.mock.calls).toEqual([
+      ['device/B']
+    ])
+  })
+
+  // Known residual: createdAt and sentAt come from the leaver's clock, so a
+  // backward step between the leave and the re-join sweeps the new row.
+  it('sweeps a re-join stamped before sentAt after a backward clock step', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'A', writerKey: 'writer-A' },
+      { id: 'B', writerKey: 'writer-B', masterTopic: 't-b', createdAt: BEFORE },
+      {
+        id: 'B-new',
+        writerKey: 'writer-B-new',
+        masterTopic: 't-b',
+        createdAt: Date.parse(SENT_AT) - 1
+      }
+    ])
+
+    await leaveVaultActionHandler.execute(leave)
+
+    expect(
+      pearpassVaultClient.activeVaultRemoveWriter.mock.calls.flat().sort()
+    ).toEqual(['writer-B', 'writer-B-new'])
+    expect(pearpassVaultClient.activeVaultRemove.mock.calls).toEqual([
+      ['device/B-new'],
+      ['device/B']
+    ])
+  })
+
   it.each([[undefined], ['not a date']])(
     'matches by writerKey only when sentAt is %p',
     async (sentAt) => {
