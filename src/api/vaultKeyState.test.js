@@ -85,6 +85,26 @@ describe('getVaultKeyState', () => {
     expect((await getVaultKeyState()).rotatedAt).toBeNull()
   })
 
+  it('counts every member as removed when the roster lists nothing', async () => {
+    pearpassVaultClient.activeVaultList.mockResolvedValue(null)
+    pearpassVaultClient.vaultsGet.mockResolvedValue(null)
+
+    const state = await getVaultKeyState()
+
+    expect(state.removed.map((d) => d.id)).toEqual(['A', 'B', 'K'])
+  })
+
+  it('reads a status without a member list as no members', async () => {
+    pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue(
+      status({ members: undefined })
+    )
+
+    const state = await getVaultKeyState()
+
+    expect(state.members).toEqual([])
+    expect(state.removed).toEqual([])
+  })
+
   it('returns null without a status for a vault', async () => {
     pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue(null)
 
@@ -210,6 +230,36 @@ describe('waitForKeyRotation', () => {
 
     await expect(result).resolves.toBeNull()
     expect(pearpassVaultClient.off).toHaveBeenCalled()
+  })
+
+  it('resolves null at once for a signal that is already aborted', async () => {
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(
+      waitForKeyRotation({
+        vaultId: 'v1',
+        deviceId: 'K',
+        timeoutMs: 50_000,
+        signal: controller.signal
+      })
+    ).resolves.toBeNull()
+    expect(pearpassVaultClient.activeVaultGetEpochStatus).not.toHaveBeenCalled()
+  })
+
+  it('settles once when two status reads both see the rotation', async () => {
+    const result = wait()
+    await jest.advanceTimersByTimeAsync(0)
+    pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue(
+      status({ epoch: 'e3', members: ['A', 'B'] })
+    )
+
+    statusHandlers()[0]({ vaultId: 'v1' })
+    statusHandlers()[0]({ vaultId: 'v1' })
+
+    await expect(result).resolves.toMatchObject({ epoch: 'e3' })
+    await jest.advanceTimersByTimeAsync(0)
+    expect(pearpassVaultClient.off).toHaveBeenCalledTimes(1)
   })
 
   it('keeps waiting when a status read fails', async () => {
