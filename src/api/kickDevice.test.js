@@ -314,6 +314,27 @@ describe('kickDevice', () => {
     )
   })
 
+  it('reports a timed-out rotation as a rotation failure that keeps the timeout text', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', writerKey: 'w-self' },
+      { id: 'B', writerKey: 'w-b' }
+    ])
+    const timeout = new Error('Request timeout: activeVaultEnsureEpoch')
+    pearpassVaultClient.activeVaultEnsureEpoch.mockRejectedValue(timeout)
+
+    const result = await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+    // No epoch result: nothing for the UI to read as a rotation.
+    expect(result.epoch).toBeNull()
+    expect(result.failures).toHaveLength(1)
+    expect(result.failures[0].kind).toBe(EPOCH_FAILURE_KIND)
+    // The extension tells a timeout from a failure by this text.
+    expect(result.failures[0].error.message).toContain(
+      'Request timeout: activeVaultEnsureEpoch'
+    )
+    expect(result.failures[0].error.cause).toBe(timeout)
+  })
+
   it('skips rotation and returns a null epoch when the roster removal fails', async () => {
     listDevices.mockResolvedValue([
       { id: 'SELF', writerKey: 'w-self' },
