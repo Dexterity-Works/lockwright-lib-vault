@@ -105,6 +105,29 @@ describe('instance management functions', () => {
     )
   })
 
+  test('detaches the epoch-status and newListener hooks when the client is replaced', () => {
+    const makeInstance = () => {
+      const listeners = new Map()
+      return {
+        listeners,
+        on: jest.fn((event, handler) => listeners.set(event, handler)),
+        off: jest.fn((event, handler) => {
+          if (listeners.get(event) === handler) listeners.delete(event)
+        })
+      }
+    }
+    const first = makeInstance()
+    const second = makeInstance()
+
+    setPearpassVaultClient(first)
+    setPearpassVaultClient(second)
+
+    expect(first.listeners.has('epoch-status')).toBe(false)
+    expect(first.listeners.has('newListener')).toBe(false)
+    expect(second.listeners.has('epoch-status')).toBe(true)
+    expect(second.listeners.has('newListener')).toBe(true)
+  })
+
   describe('epoch-status', () => {
     const setup = () => {
       const listeners = new Map()
