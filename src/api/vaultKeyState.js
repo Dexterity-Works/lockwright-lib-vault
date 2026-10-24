@@ -52,3 +52,49 @@ export const getVaultKeyState = async () => {
     removed: removedIds.map((id, i) => ({ id, name: peers[i]?.name ?? null }))
   }
 }
+
+// The key has rotated past a removed device when this vault's latest epoch
+// leaves it out and seals only to the roster: a member that rotated from an
+// older view can still seal to a duplicate row of the same peer.
+const rotatedPast = (state, vaultId, deviceId) =>
+  state?.vaultId === vaultId &&
+  !!state.epoch &&
+  !state.legacy &&
+  !state.members.includes(deviceId) &&
+  state.removed.length === 0
+
+/**
+ * Resolves with the key state once the vault's key has rotated past the
+ * device, or null at the deadline or on abort. Reads now, then again on
+ * each epoch-status for the vault (the push may carry only the vault id).
+ *
+ * @param {{ vaultId: string, deviceId: string, timeoutMs: number,
+ *   signal?: AbortSignal }} params
+ */
+export const waitForKeyRotation = ({ vaultId, deviceId, timeoutMs, signal }) =>
+  new Promise((resolve) => {
+    let done = false
+    const finish = (state) => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      pearpassVaultClient.off?.('epoch-status', onStatus)
+      signal?.removeEventListener('abort', onAbort)
+      resolve(state)
+    }
+    const check = async () => {
+      try {
+        const state = await getVaultKeyState()
+        if (rotatedPast(state, vaultId, deviceId)) finish(state)
+      } catch {}
+    }
+    const onStatus = (status) => {
+      if (status?.vaultId === vaultId) check()
+    }
+    const onAbort = () => finish(null)
+    const timer = setTimeout(onAbort, timeoutMs)
+    signal?.addEventListener('abort', onAbort)
+    pearpassVaultClient.on?.('epoch-status', onStatus)
+    if (signal?.aborted) onAbort()
+    else check()
+  })

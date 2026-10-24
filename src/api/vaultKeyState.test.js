@@ -1,5 +1,5 @@
 import { pearpassVaultClient } from '../instances'
-import { getVaultKeyState } from './vaultKeyState'
+import { getVaultKeyState, waitForKeyRotation } from './vaultKeyState'
 
 const status = (overrides = {}) => ({
   vaultId: 'v1',
@@ -89,5 +89,141 @@ describe('getVaultKeyState', () => {
     pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue(null)
 
     expect(await getVaultKeyState()).toBeNull()
+  })
+})
+
+describe('waitForKeyRotation', () => {
+  const statusHandlers = () =>
+    pearpassVaultClient.on.mock.calls
+      .filter(([event]) => event === 'epoch-status')
+      .map(([, handler]) => handler)
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    jest.useFakeTimers()
+    pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue(status())
+    pearpassVaultClient.activeVaultList.mockResolvedValue([
+      { id: 'A' },
+      { id: 'B' }
+    ])
+    pearpassVaultClient.activeVaultGet.mockResolvedValue({ createdAt: 5 })
+    pearpassVaultClient.vaultsGet.mockResolvedValue(null)
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  const wait = () =>
+    waitForKeyRotation({ vaultId: 'v1', deviceId: 'K', timeoutMs: 50_000 })
+
+  it('resolves at once when the latest key leaves the device out', async () => {
+    pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue(
+      status({ epoch: 'e3', members: ['A', 'B'] })
+    )
+
+    const state = await wait()
+
+    expect(state).toMatchObject({ epoch: 'e3', rotatedAt: 5, removed: [] })
+    expect(pearpassVaultClient.off).toHaveBeenCalledWith(
+      'epoch-status',
+      statusHandlers()[0]
+    )
+  })
+
+  it('resolves on the epoch-status that shows the rotation', async () => {
+    const result = wait()
+    await jest.advanceTimersByTimeAsync(0)
+    pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue(
+      status({ epoch: 'e3', members: ['A', 'B'] })
+    )
+
+    statusHandlers()[0]({ vaultId: 'v1' })
+
+    await expect(result).resolves.toMatchObject({ epoch: 'e3' })
+  })
+
+  it('ignores an epoch-status for another vault', async () => {
+    const result = wait()
+    await jest.advanceTimersByTimeAsync(0)
+    pearpassVaultClient.activeVaultGetEpochStatus.mockClear()
+
+    statusHandlers()[0]({ vaultId: 'v2' })
+    await jest.advanceTimersByTimeAsync(0)
+
+    expect(pearpassVaultClient.activeVaultGetEpochStatus).not.toHaveBeenCalled()
+    await jest.advanceTimersByTimeAsync(50_000)
+    await expect(result).resolves.toBeNull()
+  })
+
+  it('does not count a new key that still reaches another removed device', async () => {
+    pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue(
+      status({ epoch: 'e3', members: ['A', 'B', 'X'] })
+    )
+
+    const result = wait()
+    await jest.advanceTimersByTimeAsync(50_000)
+
+    await expect(result).resolves.toBeNull()
+  })
+
+  it('does not count a legacy vault or a status for another vault', async () => {
+    pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue(
+      status({ epoch: null, legacy: true, members: [] })
+    )
+    const legacy = wait()
+    await jest.advanceTimersByTimeAsync(50_000)
+    await expect(legacy).resolves.toBeNull()
+
+    pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue(
+      status({ vaultId: 'v2', epoch: 'e3', members: ['A', 'B'] })
+    )
+    const other = wait()
+    await jest.advanceTimersByTimeAsync(50_000)
+    await expect(other).resolves.toBeNull()
+  })
+
+  it('resolves null at the deadline and stops listening', async () => {
+    const result = wait()
+    await jest.advanceTimersByTimeAsync(49_999)
+    expect(pearpassVaultClient.off).not.toHaveBeenCalled()
+
+    await jest.advanceTimersByTimeAsync(1)
+
+    await expect(result).resolves.toBeNull()
+    expect(pearpassVaultClient.off).toHaveBeenCalledWith(
+      'epoch-status',
+      statusHandlers()[0]
+    )
+  })
+
+  it('resolves null when aborted', async () => {
+    const controller = new AbortController()
+    const result = waitForKeyRotation({
+      vaultId: 'v1',
+      deviceId: 'K',
+      timeoutMs: 50_000,
+      signal: controller.signal
+    })
+
+    controller.abort()
+
+    await expect(result).resolves.toBeNull()
+    expect(pearpassVaultClient.off).toHaveBeenCalled()
+  })
+
+  it('keeps waiting when a status read fails', async () => {
+    pearpassVaultClient.activeVaultGetEpochStatus.mockRejectedValueOnce(
+      new Error('boom')
+    )
+    const result = wait()
+    await jest.advanceTimersByTimeAsync(0)
+    pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue(
+      status({ epoch: 'e3', members: ['A', 'B'] })
+    )
+
+    statusHandlers()[0]({ vaultId: 'v1' })
+
+    await expect(result).resolves.toMatchObject({ epoch: 'e3' })
   })
 })

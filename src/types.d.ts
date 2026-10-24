@@ -100,6 +100,13 @@ export interface VaultKeyState {
 
 export declare function getVaultKeyState(): Promise<VaultKeyState | null>
 
+export declare function waitForKeyRotation(_params: {
+  vaultId: string
+  deviceId: string
+  timeoutMs: number
+  signal?: AbortSignal
+}): Promise<VaultKeyState | null>
+
 export declare const EPOCH_FAILURE_KIND: 'epoch'
 
 export interface KickDeviceResult extends BroadcastActionResult {
