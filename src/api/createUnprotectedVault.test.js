@@ -24,6 +24,15 @@ describe('createUnprotectedVault', () => {
     jest.clearAllMocks()
   })
 
+  it('rejects a vault without an id before touching the active vault', async () => {
+    await expect(createUnprotectedVault({ name: 'No id' })).rejects.toThrow(
+      'Vault id is required'
+    )
+
+    expect(pearpassVaultClient.activeVaultGetStatus).not.toHaveBeenCalled()
+    expect(pearpassVaultClient.vaultsAdd).not.toHaveBeenCalled()
+  })
+
   it('should close active vault if one exists before creating new vault', async () => {
     pearpassVaultClient.activeVaultGetStatus.mockResolvedValue({ status: true })
     pearpassVaultClient.encryptVaultKeyWithHashedPassword.mockResolvedValue({
