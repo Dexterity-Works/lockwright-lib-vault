@@ -29,6 +29,7 @@ export { broadcastDeleteVault } from './api/broadcastDeleteVault'
 export { VaultNotActiveError } from './api/deleteVaultLocal'
 export { EPOCH_FAILURE_KIND, kickDevice } from './api/kickDevice'
 export { runActionScan } from './api/actionRunner'
+export { getVaultKeyState } from './api/vaultKeyState'
 export { getMyDeviceId } from './utils/getMyDeviceId'
 
 export { ACTION_TYPES, ACTIONS } from './actions'
