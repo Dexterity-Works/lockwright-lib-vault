@@ -97,6 +97,28 @@ describe('leaveVaultActionHandler', () => {
     ])
   })
 
+  it('starts the epoch a leaver owed, so a legacy vault does not stay readable to it', async () => {
+    // The leaver asked for the first epoch and left before it landed; its
+    // owed start leaves with it. Only a start from this member rotates.
+    listDevices.mockResolvedValue([
+      { id: 'A', writerKey: 'writer-A' },
+      { id: 'B', writerKey: 'writer-B' }
+    ])
+    pearpassVaultClient.activeVaultEnsureEpoch.mockImplementation(
+      async ({ start }) =>
+        start === true
+          ? { rotated: true, id: 'e1', seq: 1, members: ['A'], uncovered: [] }
+          : { rotated: false, reason: 'legacy', uncovered: [] }
+    )
+
+    await expect(
+      leaveVaultActionHandler.execute(leave)
+    ).resolves.toBeUndefined()
+    expect(pearpassVaultClient.activeVaultRemove).toHaveBeenCalledWith(
+      'device/B'
+    )
+  })
+
   it('still rotates when the actor row is already gone', async () => {
     listDevices.mockResolvedValue([{ id: 'A', writerKey: 'writer-A' }])
 
