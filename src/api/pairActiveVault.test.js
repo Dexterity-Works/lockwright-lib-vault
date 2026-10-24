@@ -104,6 +104,15 @@ describe('pairActiveVault', () => {
     )
   })
 
+  it('pairs when the catalog lists no vaults', async () => {
+    listVaults.mockResolvedValue(null)
+
+    await expect(pairActiveVault(mockInviteCode)).resolves.toBe(mockVaultId)
+    expect(pearpassVaultClient.pairActiveVault).toHaveBeenCalledWith(
+      mockInviteCode
+    )
+  })
+
   it('refuses an invite whose vault id is already in the catalog', async () => {
     listVaults.mockResolvedValue([{ id: mockVaultId, name: 'Mine' }])
 
