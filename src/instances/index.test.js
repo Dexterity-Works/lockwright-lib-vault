@@ -147,14 +147,14 @@ describe('instance management functions', () => {
       expect(mockInstance.emit).not.toHaveBeenCalled()
     })
 
-    test('emits again after a not-revoked status for the same vault', async () => {
+    test('keeps an epoch mark through a not-revoked status', async () => {
       const { mockInstance, fire } = setup()
 
       await fire({ vaultId: 'v1', revoked: true, canRead: false })
       await fire({ vaultId: 'v1', revoked: false, canRead: true })
       await fire({ vaultId: 'v1', revoked: true, canRead: false })
 
-      expect(mockInstance.emit).toHaveBeenCalledTimes(2)
+      expect(mockInstance.emit).toHaveBeenCalledTimes(1)
     })
 
     test('emits once per vault across a kick envelope and an epoch status', async () => {

@@ -1,9 +1,5 @@
 import { logger } from '../utils/logger'
-import {
-  clearAllRevoked,
-  clearRevoked,
-  markRevoked
-} from '../utils/revocationGuard'
+import { clearAllRevoked, markRevoked } from '../utils/revocationGuard'
 
 export let pearpassVaultClient
 
@@ -144,10 +140,7 @@ const handleEpochStatus = (status) => {
     logger.error('epoch-status: status has no vaultId; ignoring')
     return
   }
-  if (status.revoked === false) {
-    clearRevoked(vaultId, 'epoch')
-    return
-  }
+  // A not-revoked status clears nothing: only a wipe, pair, or create does.
   if (status.revoked !== true) return
   if (!(pearpassVaultClient.listenerCount?.('vault-access-revoked') > 0)) return
   if (!markRevoked(vaultId, 'epoch')) return
