@@ -1,10 +1,12 @@
 import { ACTION_TYPES } from '../actions'
 import { pearpassVaultClient } from '../instances'
 import { broadcastAction } from './broadcastAction'
-import { deleteVaultLocal } from './deleteVaultLocal'
+import { deleteVaultLocal, VaultNotActiveError } from './deleteVaultLocal'
 import { listVaults } from './listVaults'
+import { deleteVaultActionHandler } from '../actions/handlers/deleteVault'
 import { kickDeviceActionHandler } from '../actions/handlers/kickDevice'
 import { getMyDeviceId } from '../utils/getMyDeviceId'
+import { clearAllRevoked } from '../utils/revocationGuard'
 
 jest.mock('./listVaults', () => ({
   listVaults: jest.fn()
@@ -21,7 +23,64 @@ jest.mock('../utils/getMyDeviceId', () => ({
 describe('deleteVaultLocal', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    clearAllRevoked()
     getMyDeviceId.mockResolvedValue('SELF')
+    pearpassVaultClient.activeVaultGetStatus.mockResolvedValue({ status: true })
+    pearpassVaultClient.activeVaultGet.mockResolvedValue({ id: 'v1' })
+  })
+
+  it('refuses a vault that is not active before it reads the device id', async () => {
+    pearpassVaultClient.activeVaultGet.mockResolvedValue({ id: 'v2' })
+
+    const error = await deleteVaultLocal('v1').catch((e) => e)
+
+    expect(error).toBeInstanceOf(VaultNotActiveError)
+    expect(error.name).toBe('VaultNotActiveError')
+    expect(error.vaultId).toBe('v1')
+    expect(getMyDeviceId).not.toHaveBeenCalled()
+    expect(broadcastAction).not.toHaveBeenCalled()
+    expect(pearpassVaultClient.removeVault).not.toHaveBeenCalled()
+  })
+
+  it('refuses when no vault is active', async () => {
+    pearpassVaultClient.activeVaultGetStatus.mockResolvedValue({
+      status: false
+    })
+
+    await expect(deleteVaultLocal('v1')).rejects.toBeInstanceOf(
+      VaultNotActiveError
+    )
+    expect(broadcastAction).not.toHaveBeenCalled()
+    expect(pearpassVaultClient.removeVault).not.toHaveBeenCalled()
+  })
+
+  it('wipes a kicked vault that is not active, without a leave', async () => {
+    pearpassVaultClient.activeVaultGet.mockResolvedValue({ id: 'v2' })
+    pearpassVaultClient.listenerCount.mockReturnValue(1)
+    await kickDeviceActionHandler.execute({
+      actor: 'A',
+      payload: { vaultId: 'v1', targetDeviceId: 'SELF' }
+    })
+
+    await deleteVaultLocal('v1')
+
+    expect(getMyDeviceId).not.toHaveBeenCalled()
+    expect(broadcastAction).not.toHaveBeenCalled()
+    expect(pearpassVaultClient.removeVault).toHaveBeenCalledWith('v1')
+  })
+
+  it('wipes a vault erased from all devices that is not active, without a leave', async () => {
+    pearpassVaultClient.activeVaultGet.mockResolvedValue({ id: 'v2' })
+    pearpassVaultClient.listenerCount.mockReturnValue(1)
+    await deleteVaultActionHandler.execute({
+      actor: 'A',
+      payload: { vaultId: 'v1' }
+    })
+
+    await deleteVaultLocal('v1')
+
+    expect(broadcastAction).not.toHaveBeenCalled()
+    expect(pearpassVaultClient.removeVault).toHaveBeenCalledWith('v1')
   })
 
   it('throws when vaultId is missing', async () => {

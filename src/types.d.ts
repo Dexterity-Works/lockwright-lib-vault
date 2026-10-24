@@ -42,6 +42,12 @@ export declare function broadcastDeleteVault(
   _vaultId: string
 ): Promise<BroadcastActionResult>
 
+export declare class VaultNotActiveError extends Error {
+  name: 'VaultNotActiveError'
+  vaultId: string
+  constructor(_vaultId: string)
+}
+
 export declare function deleteVaultLocal(
   _vaultId: string
 ): Promise<Array<unknown>>
