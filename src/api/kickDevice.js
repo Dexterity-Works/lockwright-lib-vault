@@ -4,6 +4,7 @@ import { broadcastAction } from './broadcastAction'
 import { getCurrentVault } from './getCurrentVault'
 import { listDevices } from './listDevices'
 import { logger } from '../utils/logger'
+import { startLegacyEpoch } from '../utils/startLegacyEpoch'
 import { sweepDeviceRows } from '../utils/sweepDeviceRows'
 
 // Marks a `failures` entry as a key rotation that did not happen, as opposed
@@ -51,27 +52,8 @@ export const kickDevice = async ({ vaultId, targetDeviceId } = {}) => {
     throw new Error('kickDevice: cannot kick self')
   }
 
-  // 0. A legacy vault has no epoch for other members to rotate: a kick cut
-  //    short after the sweep (lock, quit, a closed popup) would leave every
-  //    later write plaintext to the removed device. Start the epoch while
-  //    the target is still a member; from then on any member rotates past
-  //    the removal when it syncs. Nothing is removed if the start fails.
-  let status = null
-  try {
-    status = await pearpassVaultClient.activeVaultGetEpochStatus()
-  } catch {
-    // Unknown: the rotation after the sweep still runs.
-  }
-  if (status?.legacy === true) {
-    const started = await pearpassVaultClient.activeVaultEnsureEpoch({
-      start: true
-    })
-    if (started?.rotated !== true) {
-      throw new Error(
-        `kickDevice: cannot start the vault key: ${started?.reason ?? 'no result'}`
-      )
-    }
-  }
+  // 0. Start a legacy vault's epoch while the target is still a member.
+  await startLegacyEpoch('kickDevice')
 
   // 1. Send the envelope first, while the target's device record (and its
   //    masterTopic) is still in the local view. broadcastAction looks up

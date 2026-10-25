@@ -25,6 +25,10 @@ describe('leaveVaultActionHandler', () => {
     pearpassVaultClient.activeVaultRemoveWriter.mockResolvedValue(undefined)
     pearpassVaultClient.activeVaultRemove.mockResolvedValue(undefined)
     pearpassVaultClient.vaultsGet.mockResolvedValue(undefined)
+    pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue({
+      vaultId: 'v1',
+      legacy: false
+    })
     pearpassVaultClient.activeVaultEnsureEpoch.mockResolvedValue({
       rotated: true,
       id: 'e2',
@@ -32,6 +36,48 @@ describe('leaveVaultActionHandler', () => {
       members: ['A'],
       uncovered: []
     })
+  })
+
+  it('starts the epoch of a legacy vault before it sweeps the leaver', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'A', writerKey: 'writer-A' },
+      { id: 'B', writerKey: 'writer-B' }
+    ])
+    pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue({
+      vaultId: 'v1',
+      legacy: true
+    })
+    const calls = []
+    pearpassVaultClient.activeVaultEnsureEpoch.mockImplementation(async () => {
+      calls.push('ensureEpoch')
+      return { rotated: true, id: 'e1', seq: 1, members: [], uncovered: [] }
+    })
+    pearpassVaultClient.activeVaultRemoveWriter.mockImplementation(async () =>
+      calls.push('removeWriter')
+    )
+
+    await leaveVaultActionHandler.execute(leave)
+
+    expect(calls).toEqual(['ensureEpoch', 'removeWriter', 'ensureEpoch'])
+  })
+
+  it('leaves a legacy vault untouched while its epoch cannot start', async () => {
+    listDevices.mockResolvedValue([{ id: 'B', writerKey: 'writer-B' }])
+    pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue({
+      vaultId: 'v1',
+      legacy: true
+    })
+    pearpassVaultClient.activeVaultEnsureEpoch.mockResolvedValue({
+      rotated: false,
+      reason: 'not-writable',
+      uncovered: []
+    })
+
+    await expect(leaveVaultActionHandler.execute(leave)).rejects.toThrow(
+      'cannot start the vault key'
+    )
+    expect(pearpassVaultClient.activeVaultRemoveWriter).not.toHaveBeenCalled()
+    expect(pearpassVaultClient.activeVaultRemove).not.toHaveBeenCalled()
   })
 
   it('never sweeps another vault when the active vault switches mid-leave', async () => {

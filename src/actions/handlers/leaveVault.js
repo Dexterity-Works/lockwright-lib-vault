@@ -2,6 +2,7 @@ import { getCurrentVault } from '../../api/getCurrentVault'
 import { listDevices } from '../../api/listDevices'
 import { pearpassVaultClient } from '../../instances'
 import { logger } from '../../utils/logger'
+import { startLegacyEpoch } from '../../utils/startLegacyEpoch'
 import { sweepDeviceRows } from '../../utils/sweepDeviceRows'
 
 // Defer when the target vault isn't active; we can only write to the
@@ -29,6 +30,8 @@ export const leaveVaultActionHandler = {
     // Sweep from the peer record so late duplicates still go, then rotate,
     // or the inbox drops the entry and the leaver keeps reading.
     const primary = actorDevice ?? (await peerRecord(actorId))
+    // A throw leaves the leaver in place for the inbox retry.
+    await startLegacyEpoch('leave-vault')
     await sweepDeviceRows({
       primary,
       devices,

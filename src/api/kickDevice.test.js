@@ -277,6 +277,22 @@ describe('kickDevice', () => {
     ])
   })
 
+  it('stops before touching the target when the epoch status cannot be read', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', writerKey: 'w-self' },
+      { id: 'B', writerKey: 'w-b' }
+    ])
+    pearpassVaultClient.activeVaultGetEpochStatus.mockRejectedValue(
+      new Error('worklet busy')
+    )
+
+    await expect(
+      kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+    ).rejects.toThrow('worklet busy')
+    expect(broadcastAction).not.toHaveBeenCalled()
+    expect(pearpassVaultClient.activeVaultRemoveWriter).not.toHaveBeenCalled()
+  })
+
   it.each([
     [{ rotated: false, reason: 'not-writable', uncovered: [] }],
     [null]
