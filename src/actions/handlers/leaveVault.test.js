@@ -107,6 +107,17 @@ describe('leaveVaultActionHandler', () => {
     )
   })
 
+  it('drops the actor row without revoking when it has no writer key', async () => {
+    listDevices.mockResolvedValue([{ id: 'B' }])
+
+    await leaveVaultActionHandler.execute(leave)
+
+    expect(pearpassVaultClient.activeVaultRemoveWriter).not.toHaveBeenCalled()
+    expect(pearpassVaultClient.activeVaultRemove).toHaveBeenCalledWith(
+      'device/B'
+    )
+  })
+
   it('rotates the epoch after dropping the device row', async () => {
     listDevices.mockResolvedValue([{ id: 'B', writerKey: 'writer-B' }])
     const calls = []
@@ -381,6 +392,15 @@ describe('leaveVaultActionHandler', () => {
 
     await expect(leaveVaultActionHandler.execute(leave)).rejects.toThrow(
       'not-writable'
+    )
+  })
+
+  it('reports a missing rotation result', async () => {
+    listDevices.mockResolvedValue([{ id: 'B', writerKey: 'writer-B' }])
+    pearpassVaultClient.activeVaultEnsureEpoch.mockResolvedValue(undefined)
+
+    await expect(leaveVaultActionHandler.execute(leave)).rejects.toThrow(
+      'epoch rotation failed: no result'
     )
   })
 
