@@ -23,14 +23,20 @@ import { pearpassVaultClient } from '../instances'
  *   devices: Array<{ id?: string, writerKey?: string | null, masterTopic?: string | null }>,
  *   myWriterKey: string | null,
  *   topicMatchApplies?: (row: { createdAt?: number }) => boolean
+ *   vaultId?: string | null
  * }} params
  */
 export const sweepDeviceRows = async ({
   primary,
   devices,
   myWriterKey,
-  topicMatchApplies = () => true
+  topicMatchApplies = () => true,
+  vaultId = null
 }) => {
+  // A row of another vault (the active vault switched mid-call) shares the
+  // peer's masterTopic but is not this vault's to drop.
+  const elsewhere = (d) => !!vaultId && !!d?.vaultId && d.vaultId !== vaultId
+  devices = devices.filter((d) => !elsewhere(d))
   const isOwn = (d) => !!myWriterKey && d.writerKey === myWriterKey
   const matches = (d) =>
     (!!primary.writerKey && d.writerKey === primary.writerKey) ||

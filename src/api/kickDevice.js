@@ -1,6 +1,7 @@
 import { ACTION_TYPES } from '../actions'
 import { pearpassVaultClient } from '../instances'
 import { broadcastAction } from './broadcastAction'
+import { getCurrentVault } from './getCurrentVault'
 import { listDevices } from './listDevices'
 import { logger } from '../utils/logger'
 import { sweepDeviceRows } from '../utils/sweepDeviceRows'
@@ -114,10 +115,16 @@ export const kickDevice = async ({ vaultId, targetDeviceId } = {}) => {
       )
     }
 
+    // Every step acts on whatever vault is active; another UI may have
+    // switched it while the envelope went out.
+    if ((await getCurrentVault())?.id !== vaultId) {
+      throw new Error('kickDevice: the vault is no longer the active vault')
+    }
+
     // 3. Drop every app-layer index entry for the same peer (same writerKey
     //    or masterTopic). A stranded row keeps appearing in the paired-
     //    devices list and keeps the kicked device sealable for the epoch.
-    await sweepDeviceRows({ primary: target, devices, myWriterKey })
+    await sweepDeviceRows({ primary: target, devices, myWriterKey, vaultId })
   } catch (error) {
     logger.error(
       'kickDevice: autobase removal failed; envelope already in flight',

@@ -6,11 +6,16 @@ jest.mock('./listDevices', () => ({
   listDevices: jest.fn()
 }))
 
+jest.mock('./getCurrentVault', () => ({
+  getCurrentVault: jest.fn()
+}))
+
 jest.mock('../actions', () => ({
   ACTION_TYPES: { KICK_DEVICE: 'kick-device' }
 }))
 
 import { broadcastAction } from './broadcastAction'
+import { getCurrentVault } from './getCurrentVault'
 import { EPOCH_FAILURE_KIND, kickDevice } from './kickDevice'
 import { listDevices } from './listDevices'
 import { pearpassVaultClient } from '../instances'
@@ -20,6 +25,8 @@ describe('kickDevice', () => {
     broadcastAction.mockReset()
     broadcastAction.mockResolvedValue({ results: [], failures: [] })
     listDevices.mockReset()
+    getCurrentVault.mockReset()
+    getCurrentVault.mockResolvedValue({ id: 'v1' })
     pearpassVaultClient.activeVaultGetWriterKey.mockReset()
     pearpassVaultClient.activeVaultGetWriterKey.mockResolvedValue('w-self')
     pearpassVaultClient.activeVaultRemoveWriter.mockReset()
@@ -295,6 +302,28 @@ describe('kickDevice', () => {
       expect(pearpassVaultClient.activeVaultRemove).not.toHaveBeenCalled()
     }
   )
+
+  it('removes nothing and rotates nothing once another vault is active', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', vaultId: 'v1', writerKey: 'w-self' },
+      { id: 'B', vaultId: 'v1', writerKey: 'w-b' }
+    ])
+    // The other UI switches vaults while the envelope goes out.
+    broadcastAction.mockImplementation(async () => {
+      getCurrentVault.mockResolvedValue({ id: 'v2' })
+      return { results: [], failures: [] }
+    })
+
+    const result = await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+    expect(pearpassVaultClient.activeVaultRemoveWriter).not.toHaveBeenCalled()
+    expect(pearpassVaultClient.activeVaultRemove).not.toHaveBeenCalled()
+    expect(pearpassVaultClient.activeVaultEnsureEpoch).not.toHaveBeenCalled()
+    expect(result.epoch).toBeNull()
+    expect(result.failures).toEqual([
+      { targetDeviceId: 'B', error: expect.any(Error) }
+    ])
+  })
 
   it('reports a rotation that did not happen as a failure', async () => {
     listDevices.mockResolvedValue([

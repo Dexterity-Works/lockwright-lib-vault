@@ -34,6 +34,35 @@ describe('leaveVaultActionHandler', () => {
     })
   })
 
+  it('never sweeps another vault when the active vault switches mid-leave', async () => {
+    // The switch lands between the vault check and the roster read: the
+    // leaver's row in v2 shares its masterTopic.
+    listDevices.mockResolvedValue([
+      { id: 'A2', vaultId: 'v2', writerKey: 'writer-A2' },
+      {
+        id: 'B2',
+        vaultId: 'v2',
+        writerKey: 'writer-B2',
+        masterTopic: 'topic-B'
+      }
+    ])
+    pearpassVaultClient.vaultsGet.mockResolvedValue({
+      writerKey: 'writer-B',
+      masterTopic: 'topic-B'
+    })
+    getCurrentVault
+      .mockResolvedValueOnce({ id: 'v1' })
+      .mockResolvedValue({ id: 'v2' })
+
+    await expect(leaveVaultActionHandler.execute(leave)).rejects.toThrow(
+      'no longer the active vault'
+    )
+
+    expect(pearpassVaultClient.activeVaultRemoveWriter).not.toHaveBeenCalled()
+    expect(pearpassVaultClient.activeVaultRemove).not.toHaveBeenCalled()
+    expect(pearpassVaultClient.activeVaultEnsureEpoch).not.toHaveBeenCalled()
+  })
+
   it('revokes the leaver as a writer before dropping its device row', async () => {
     listDevices.mockResolvedValue([
       { id: 'A', writerKey: 'writer-A' },

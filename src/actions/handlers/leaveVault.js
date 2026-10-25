@@ -33,8 +33,14 @@ export const leaveVaultActionHandler = {
       primary,
       devices,
       myWriterKey,
-      topicMatchApplies: createdBefore(Date.parse(action?.sentAt))
+      topicMatchApplies: createdBefore(Date.parse(action?.sentAt)),
+      vaultId
     })
+    // Each step acts on whatever vault is active: after a switch, leave the
+    // entry for the inbox to retry instead of rotating another vault.
+    if ((await getCurrentVault())?.id !== vaultId) {
+      throw new Error('leave-vault: the vault is no longer the active vault')
+    }
 
     const epoch = await pearpassVaultClient.activeVaultEnsureEpoch({
       start: true
