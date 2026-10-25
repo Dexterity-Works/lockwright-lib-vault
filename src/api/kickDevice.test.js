@@ -423,6 +423,23 @@ describe('kickDevice', () => {
     expect(result.failures[0].error.cause).toBe(timeout)
   })
 
+  it('stringifies a rotation rejection without a message', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', writerKey: 'w-self' },
+      { id: 'B', writerKey: 'w-b' }
+    ])
+    const rejection = { code: 'ROTATION_FAILED' }
+    pearpassVaultClient.activeVaultEnsureEpoch.mockRejectedValue(rejection)
+
+    const result = await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+    expect(result.failures).toHaveLength(1)
+    expect(result.failures[0].error.message).toBe(
+      'epoch rotation failed: [object Object]'
+    )
+    expect(result.failures[0].error.cause).toBe(rejection)
+  })
+
   it('skips rotation and returns a null epoch when the roster removal fails', async () => {
     listDevices.mockResolvedValue([
       { id: 'SELF', writerKey: 'w-self' },
