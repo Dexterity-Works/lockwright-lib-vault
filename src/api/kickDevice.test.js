@@ -26,6 +26,7 @@ describe('kickDevice', () => {
     pearpassVaultClient.activeVaultRemoveWriter.mockResolvedValue(undefined)
     pearpassVaultClient.activeVaultRemove.mockReset()
     pearpassVaultClient.activeVaultRemove.mockResolvedValue(undefined)
+    pearpassVaultClient.activeVaultGetEpochStatus.mockReset()
     pearpassVaultClient.activeVaultEnsureEpoch.mockReset()
     pearpassVaultClient.activeVaultEnsureEpoch.mockResolvedValue({
       rotated: true,
@@ -236,6 +237,64 @@ describe('kickDevice', () => {
       }
     })
   })
+
+  it('starts the epoch of a legacy vault before it touches the target', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', writerKey: 'w-self' },
+      { id: 'B', writerKey: 'w-b' }
+    ])
+    pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue({
+      vaultId: 'v1',
+      legacy: true
+    })
+    const callOrder = []
+    broadcastAction.mockImplementation(async () => {
+      callOrder.push('broadcast')
+      return { results: [], failures: [] }
+    })
+    pearpassVaultClient.activeVaultRemoveWriter.mockImplementation(async () => {
+      callOrder.push('removeWriter')
+    })
+    pearpassVaultClient.activeVaultEnsureEpoch.mockImplementation(async () => {
+      callOrder.push('ensureEpoch')
+      return { rotated: true, id: 'e1', seq: 1, members: [], uncovered: [] }
+    })
+
+    await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+    expect(callOrder).toEqual([
+      'ensureEpoch',
+      'broadcast',
+      'removeWriter',
+      'ensureEpoch'
+    ])
+  })
+
+  it.each([
+    [{ rotated: false, reason: 'not-writable', uncovered: [] }],
+    [null]
+  ])(
+    'leaves a legacy vault untouched when its epoch cannot start (%p)',
+    async (started) => {
+      listDevices.mockResolvedValue([
+        { id: 'SELF', writerKey: 'w-self' },
+        { id: 'B', writerKey: 'w-b' }
+      ])
+      pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue({
+        vaultId: 'v1',
+        legacy: true
+      })
+      pearpassVaultClient.activeVaultEnsureEpoch.mockResolvedValue(started)
+
+      await expect(
+        kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+      ).rejects.toThrow('cannot start the vault key')
+
+      expect(broadcastAction).not.toHaveBeenCalled()
+      expect(pearpassVaultClient.activeVaultRemoveWriter).not.toHaveBeenCalled()
+      expect(pearpassVaultClient.activeVaultRemove).not.toHaveBeenCalled()
+    }
+  )
 
   it('reports a rotation that did not happen as a failure', async () => {
     listDevices.mockResolvedValue([
