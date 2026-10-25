@@ -43,7 +43,8 @@ describe('leaveVaultActionHandler', () => {
         id: 'B2',
         vaultId: 'v2',
         writerKey: 'writer-B2',
-        masterTopic: 'topic-B'
+        masterTopic: 'topic-B',
+        createdAt: BEFORE
       }
     ])
     pearpassVaultClient.vaultsGet.mockResolvedValue({
