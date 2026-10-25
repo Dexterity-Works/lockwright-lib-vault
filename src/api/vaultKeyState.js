@@ -22,6 +22,10 @@ export const getVaultKeyState = async () => {
   if (!status?.vaultId) return null
 
   const roster = new Set(((await listDevices()) ?? []).map((d) => d?.id))
+  // The roster is read on whatever vault is active by now: another vault's
+  // ids would all look removed.
+  const after = await pearpassVaultClient.activeVaultGetEpochStatus()
+  if (after?.vaultId !== status.vaultId) return null
   const members = Array.isArray(status.members) ? status.members : []
   const removedIds = members.filter((id) => !roster.has(id))
   const orNull = async (read) => {

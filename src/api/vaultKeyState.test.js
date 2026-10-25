@@ -105,6 +105,14 @@ describe('getVaultKeyState', () => {
     expect(state.removed).toEqual([])
   })
 
+  it('returns null when the active vault switches during the read', async () => {
+    pearpassVaultClient.activeVaultGetEpochStatus
+      .mockResolvedValueOnce(status())
+      .mockResolvedValue(status({ vaultId: 'v2', members: ['C'] }))
+
+    expect(await getVaultKeyState()).toBeNull()
+  })
+
   it('returns null without a status for a vault', async () => {
     pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue(null)
 
