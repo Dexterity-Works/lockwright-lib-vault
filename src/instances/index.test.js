@@ -217,6 +217,23 @@ describe('instance management functions', () => {
       expect(mockInstance.emit).not.toHaveBeenCalled()
     })
 
+    test('ignores an empty epoch status', async () => {
+      const { mockInstance, fire } = setup()
+
+      await fire(undefined)
+
+      expect(mockInstance.emit).not.toHaveBeenCalled()
+    })
+
+    test('ignores unrelated listener subscriptions', async () => {
+      const { mockInstance, subscribe } = setup()
+
+      await subscribe('unrelated-event')
+
+      expect(mockRunActionScan).not.toHaveBeenCalled()
+      expect(mockInstance.activeVaultGetEpochStatus).not.toHaveBeenCalled()
+    })
+
     test('holds a revocation until a vault-access-revoked listener exists', async () => {
       const { mockInstance, fire } = setup()
       mockInstance.listenerCount.mockReturnValue(0)
