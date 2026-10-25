@@ -36,6 +36,12 @@ export const kickDevice = async ({ vaultId, targetDeviceId } = {}) => {
     throw new Error('kickDevice: targetDeviceId is required')
   }
 
+  // Every step below acts on whatever vault is active: refuse before the
+  // envelope goes out, so a failure here means nothing was sent.
+  if ((await getCurrentVault())?.id !== vaultId) {
+    throw new Error('kickDevice: the vault is not the active vault')
+  }
+
   const myWriterKey = await pearpassVaultClient.activeVaultGetWriterKey()
   if (!myWriterKey) {
     throw new Error('kickDevice: cannot resolve own writer key')

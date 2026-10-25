@@ -319,6 +319,20 @@ describe('kickDevice', () => {
     }
   )
 
+  it('sends nothing when another vault is active from the start', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', vaultId: 'v2', writerKey: 'w-self' },
+      { id: 'B', vaultId: 'v2', writerKey: 'w-b' }
+    ])
+    getCurrentVault.mockResolvedValue({ id: 'v2' })
+
+    await expect(
+      kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+    ).rejects.toThrow('not the active vault')
+    expect(broadcastAction).not.toHaveBeenCalled()
+    expect(pearpassVaultClient.activeVaultRemoveWriter).not.toHaveBeenCalled()
+  })
+
   it('removes nothing and rotates nothing once another vault is active', async () => {
     listDevices.mockResolvedValue([
       { id: 'SELF', vaultId: 'v1', writerKey: 'w-self' },
