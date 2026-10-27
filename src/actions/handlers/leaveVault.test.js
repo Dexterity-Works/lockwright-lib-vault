@@ -489,7 +489,11 @@ describe('leaveVaultActionHandler', () => {
       .mockResolvedValueOnce({ rotated: true, uncovered: [] })
 
     const first = await processInbox()
+    // The inbox waits out a retry delay before the next attempt.
+    const now = Date.now()
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(now + 60_000)
     const second = await processInbox()
+    clock.mockRestore()
 
     expect(first.failed).toBe(1)
     expect(second.processed).toBe(1)
@@ -551,7 +555,11 @@ describe('leaveVaultActionHandler', () => {
 
     await processInbox()
     calls.length = 0
+    // The inbox waits out a retry delay before the next attempt.
+    const now = Date.now()
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(now + 60_000)
     const second = await processInbox()
+    clock.mockRestore()
 
     expect(second.processed).toBe(1)
     expect(calls).toEqual([

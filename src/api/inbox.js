@@ -75,10 +75,13 @@ const markSeen = async (actor, envelopeId) => {
 }
 
 const INBOX_MAX_ATTEMPTS = 5
+// Each failed attempt writes the master vault, and that write triggers the
+// next scan: without a wait, all attempts went in one burst. 5 s, doubling.
+const INBOX_RETRY_MS = 5_000
 const INBOX_QUARANTINE_PREFIX = 'actions/inbox-quarantine/'
 
 /**
- * @returns {Promise<{ processed: number, skipped: number, deferred: number, failed: number, quarantined: number }>}
+ * @returns {Promise<{ processed: number, skipped: number, deferred: number, failed: number, quarantined: number, nextDueAt?: number | null }>}
  */
 export const processInbox = async () => {
   if (typeof pearpassVaultClient?.vaultsFind !== 'function') {
@@ -110,6 +113,10 @@ export const processInbox = async () => {
   let deferred = 0
   let failed = 0
   let quarantined = 0
+  let nextDueAt = null
+  const due = (at) => {
+    nextDueAt = nextDueAt === null ? at : Math.min(nextDueAt, at)
+  }
 
   for (const entry of entries) {
     const record = entry?.value
@@ -117,6 +124,11 @@ export const processInbox = async () => {
     const handler = envelope ? ACTIONS[envelope.type] : null
     if (!handler) {
       skipped += 1
+      continue
+    }
+    if (record.nextAttemptAt > Date.now()) {
+      due(record.nextAttemptAt)
+      deferred += 1
       continue
     }
 
@@ -139,11 +151,14 @@ export const processInbox = async () => {
         await quarantineEntry(entry.key, record, err)
         quarantined += 1
       } else {
+        const nextAttemptAt = Date.now() + INBOX_RETRY_MS * 2 ** (attempts - 1)
         await pearpassVaultClient.vaultsAdd(entry.key, {
           ...record,
           attempts,
+          nextAttemptAt,
           lastError: err?.message ?? String(err)
         })
+        due(nextAttemptAt)
         failed += 1
       }
     }
@@ -151,7 +166,7 @@ export const processInbox = async () => {
 
   await pruneSeen()
 
-  return { processed, skipped, deferred, failed, quarantined }
+  return { processed, skipped, deferred, failed, quarantined, nextDueAt }
 }
 
 const pruneSeen = async () => {

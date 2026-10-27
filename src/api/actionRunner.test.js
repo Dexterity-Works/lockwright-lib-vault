@@ -52,6 +52,24 @@ describe('actionRunner', () => {
     expect(mockProcessInbox).toHaveBeenCalledTimes(2)
   })
 
+  it('scans again when the earliest inbox retry is due', async () => {
+    jest.useFakeTimers()
+    try {
+      mockProcessInbox
+        .mockResolvedValueOnce({ nextDueAt: Date.now() + 5_000 })
+        .mockResolvedValue({ nextDueAt: null })
+      mockProcessOutbox.mockResolvedValue(undefined)
+
+      await runActionScan()
+      expect(mockProcessInbox).toHaveBeenCalledTimes(1)
+      await jest.advanceTimersByTimeAsync(5_000)
+
+      expect(mockProcessInbox).toHaveBeenCalledTimes(2)
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
   it('swallows processInbox errors and continues', async () => {
     mockProcessInbox.mockRejectedValueOnce(new Error('boom'))
     mockProcessOutbox.mockResolvedValue(undefined)
