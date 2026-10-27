@@ -290,6 +290,15 @@ describe('waitForKeyRotation', () => {
     await expect(result).resolves.toBeNull()
   })
 
+  it('drops a rotation time that makes no valid date', async () => {
+    pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue(
+      status({ epoch: 'e3', members: ['A', 'B'] })
+    )
+    pearpassVaultClient.activeVaultGet.mockResolvedValue({ createdAt: 1e16 })
+
+    expect((await getVaultKeyState()).rotatedAt).toBeNull()
+  })
+
   it('settles once when two status reads both see the rotation', async () => {
     const result = wait()
     await jest.advanceTimersByTimeAsync(0)

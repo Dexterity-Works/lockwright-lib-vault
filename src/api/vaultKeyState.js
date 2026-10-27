@@ -52,7 +52,10 @@ export const getVaultKeyState = async () => {
     legacy: status.legacy === true,
     canRead: status.canRead === true,
     members,
-    rotatedAt: Number.isFinite(record?.createdAt) ? record.createdAt : null,
+    // A signed record can carry any number; keep only one that makes a date.
+    rotatedAt: Number.isNaN(new Date(record?.createdAt ?? NaN).getTime())
+      ? null
+      : record.createdAt,
     removed: removedIds.map((id, i) => ({ id, name: peers[i]?.name ?? null }))
   }
 }
