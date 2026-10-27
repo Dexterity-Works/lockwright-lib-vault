@@ -255,6 +255,41 @@ describe('waitForKeyRotation', () => {
     expect(pearpassVaultClient.activeVaultGetEpochStatus).not.toHaveBeenCalled()
   })
 
+  it('does not count a status with no latest epoch while a rotation is owed', async () => {
+    pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue(
+      status({ epoch: null, legacy: false, members: [] })
+    )
+
+    const result = wait()
+    await jest.advanceTimersByTimeAsync(50_000)
+
+    await expect(result).resolves.toBeNull()
+  })
+
+  it('does not count a legacy status whose members leave the device out', async () => {
+    pearpassVaultClient.activeVaultGetEpochStatus.mockResolvedValue(
+      status({ epoch: 'e3', legacy: true, members: ['A', 'B'] })
+    )
+
+    const result = wait()
+    await jest.advanceTimersByTimeAsync(50_000)
+
+    await expect(result).resolves.toBeNull()
+  })
+
+  it('does not count a key that still includes the device itself', async () => {
+    pearpassVaultClient.activeVaultList.mockResolvedValue([
+      { id: 'A' },
+      { id: 'B' },
+      { id: 'K' }
+    ])
+
+    const result = wait()
+    await jest.advanceTimersByTimeAsync(50_000)
+
+    await expect(result).resolves.toBeNull()
+  })
+
   it('settles once when two status reads both see the rotation', async () => {
     const result = wait()
     await jest.advanceTimersByTimeAsync(0)
