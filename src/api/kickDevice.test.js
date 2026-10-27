@@ -277,6 +277,28 @@ describe('kickDevice', () => {
     ])
   })
 
+  it('still kicks through a desktop without the epoch commands, reporting the rotation it could not do', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', writerKey: 'w-self' },
+      { id: 'B', writerKey: 'w-b' }
+    ])
+    pearpassVaultClient.activeVaultGetEpochStatus.mockRejectedValue(
+      new Error('UNKNOWN_METHOD: activeVaultGetEpochStatus')
+    )
+    pearpassVaultClient.activeVaultEnsureEpoch.mockRejectedValue(
+      new Error('UNKNOWN_METHOD: activeVaultEnsureEpoch')
+    )
+
+    const result = await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+    expect(pearpassVaultClient.activeVaultRemoveWriter).toHaveBeenCalledWith(
+      'w-b'
+    )
+    expect(result.failures).toEqual([
+      expect.objectContaining({ kind: EPOCH_FAILURE_KIND })
+    ])
+  })
+
   it('stops before touching the target when the epoch status cannot be read', async () => {
     listDevices.mockResolvedValue([
       { id: 'SELF', writerKey: 'w-self' },
