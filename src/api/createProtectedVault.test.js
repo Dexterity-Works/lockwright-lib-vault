@@ -1,5 +1,6 @@
 import { createProtectedVault } from './createProtectedVault'
 import { pearpassVaultClient } from '../instances'
+import { markRevoked } from '../utils/revocationGuard'
 
 jest.mock('../instances', () => ({
   pearpassVaultClient: {
@@ -46,8 +47,11 @@ describe('createProtectedVault', () => {
     })
 
     pearpassVaultClient.decryptVaultKey.mockResolvedValue('encryption-key')
+    markRevoked(vault.id, 'kick')
 
     await createProtectedVault(vault, password)
+
+    expect(markRevoked(vault.id, 'kick')).toBe(true)
 
     expect(pearpassVaultClient.activeVaultClose).toHaveBeenCalled()
   })

@@ -1,9 +1,13 @@
+import { logger } from '../utils/logger'
+import { clearAllRevoked, markRevoked } from '../utils/revocationGuard'
+
 export let pearpassVaultClient
 
 let currentDeviceNameValue = null
 let envelopeSubscription = null
 let newListenerSubscription = null
 let masterUpdateSubscription = null
+let epochStatusSubscription = null
 
 /**
  * @param {object} instance
@@ -16,6 +20,8 @@ export const setPearpassVaultClient = (
   detachEnvelopeListener()
   detachNewListenerHook()
   detachMasterUpdateHook()
+  detachEpochStatusHook()
+  clearAllRevoked()
 
   pearpassVaultClient = instance
   currentDeviceNameValue = currentDeviceName ?? null
@@ -23,6 +29,7 @@ export const setPearpassVaultClient = (
   attachEnvelopeListener()
   attachNewListenerHook()
   attachMasterUpdateHook()
+  attachEpochStatusHook()
 }
 
 /**
@@ -71,7 +78,7 @@ const detachEnvelopeListener = () => {
 
 // Re-run processInbox when a consumer subscribes to an event our handlers
 // emit, so envelopes that arrived before the listener mounted can still be
-// delivered.
+// delivered. Re-check the epoch status for the same reason.
 const attachNewListenerHook = () => {
   if (!pearpassVaultClient?.on) return
   if (newListenerSubscription) return
@@ -81,6 +88,10 @@ const attachNewListenerHook = () => {
     try {
       const { runActionScan } = await import('../api/actionRunner.js')
       runActionScan().catch(() => {})
+    } catch {}
+    try {
+      const status = await pearpassVaultClient.activeVaultGetEpochStatus?.()
+      handleEpochStatus(status)
     } catch {}
   }
   pearpassVaultClient.on('newListener', newListenerSubscription)
@@ -116,5 +127,46 @@ const detachMasterUpdateHook = () => {
   masterUpdateSubscription = null
   if (sub && pearpassVaultClient?.off) {
     pearpassVaultClient.off('master-update', sub)
+  }
+}
+
+// Surface a revocation by key rotation (this device was left out of the
+// latest epoch) through the same event a kick envelope uses, once per vault.
+// With no listener yet, record nothing: the newListener hook re-checks.
+const handleEpochStatus = (status) => {
+  if (!status) return
+  const { vaultId } = status
+  if (!vaultId) {
+    logger.error('epoch-status: status has no vaultId; ignoring')
+    return
+  }
+  // A not-revoked status clears nothing: only a wipe, pair, or create does.
+  if (status.revoked !== true) return
+  if (!(pearpassVaultClient.listenerCount?.('vault-access-revoked') > 0)) return
+  if (!markRevoked(vaultId, 'epoch')) return
+  pearpassVaultClient.emit('vault-access-revoked', {
+    vaultId,
+    actor: null,
+    reason: 'epoch'
+  })
+}
+
+const attachEpochStatusHook = () => {
+  if (!pearpassVaultClient?.on) return
+  if (epochStatusSubscription) return
+
+  epochStatusSubscription = async (status) => {
+    try {
+      handleEpochStatus(status)
+    } catch {}
+  }
+  pearpassVaultClient.on('epoch-status', epochStatusSubscription)
+}
+
+const detachEpochStatusHook = () => {
+  const sub = epochStatusSubscription
+  epochStatusSubscription = null
+  if (sub && pearpassVaultClient?.off) {
+    pearpassVaultClient.off('epoch-status', sub)
   }
 }

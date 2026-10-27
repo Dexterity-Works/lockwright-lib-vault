@@ -1,6 +1,7 @@
 import { pearpassVaultClient } from '../instances'
 import { getMasterPasswordEncryption } from './getMasterPasswordEncryption'
 import { listVaults } from './listVaults'
+import { clearRevoked } from '../utils/revocationGuard'
 import { toCatalogVault } from '../utils/toCatalogVault'
 
 /**
@@ -39,6 +40,7 @@ export const pairActiveVault = async (inviteCode) => {
   const vault = await pearpassVaultClient.activeVaultGet(`vault`)
 
   await pearpassVaultClient.vaultsAdd(`vault/${vaultId}`, toCatalogVault(vault))
+  clearRevoked(vaultId)
 
   return vaultId
 }
