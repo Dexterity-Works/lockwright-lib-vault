@@ -9,7 +9,7 @@ const UNKNOWN_COMMAND = /UNKNOWN_METHOD|Unknown command/
  * later write plaintext to the removed device. Starting the epoch while the
  * device is still a member lets any member rotate past the removal when it
  * syncs. Throws, before anything is removed, when the status cannot be read
- * or the epoch does not start. A core without epoch commands has nothing to
+ * or the vault stays legacy. A core without epoch commands has nothing to
  * start; the caller's own rotation then reports the failure.
  *
  * @param {string} caller prefix for the error message
@@ -27,6 +27,9 @@ export const startLegacyEpoch = async (caller) => {
     start: true
   })
   if (started?.rotated === true) return
+  // Another member may have started it a moment earlier ('current').
+  const after = await pearpassVaultClient.activeVaultGetEpochStatus()
+  if (after?.legacy === false) return
   throw new Error(
     `${caller}: cannot start the vault key: ${started?.reason ?? 'no result'}`
   )

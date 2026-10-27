@@ -299,6 +299,27 @@ describe('kickDevice', () => {
     ])
   })
 
+  it('goes on when another member started the first epoch a moment earlier', async () => {
+    listDevices.mockResolvedValue([
+      { id: 'SELF', writerKey: 'w-self' },
+      { id: 'B', writerKey: 'w-b' }
+    ])
+    pearpassVaultClient.activeVaultGetEpochStatus
+      .mockResolvedValueOnce({ vaultId: 'v1', legacy: true })
+      .mockResolvedValue({ vaultId: 'v1', legacy: false })
+    pearpassVaultClient.activeVaultEnsureEpoch.mockResolvedValue({
+      rotated: false,
+      reason: 'current',
+      uncovered: []
+    })
+
+    await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
+
+    expect(pearpassVaultClient.activeVaultRemoveWriter).toHaveBeenCalledWith(
+      'w-b'
+    )
+  })
+
   it('stops before touching the target when the epoch status cannot be read', async () => {
     listDevices.mockResolvedValue([
       { id: 'SELF', writerKey: 'w-self' },
