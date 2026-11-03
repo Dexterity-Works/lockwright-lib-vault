@@ -4,6 +4,8 @@ import { logger } from '../utils/logger'
 
 let isProcessing = false
 let pendingRescan = false
+// One timer for the earliest inbox entry waiting out its retry delay.
+let retryTimer = null
 
 /** @returns {Promise<void>} */
 export const runActionScan = async () => {
@@ -18,7 +20,11 @@ export const runActionScan = async () => {
       pendingRescan = false
 
       try {
-        await processInbox()
+        const { nextDueAt } = (await processInbox()) ?? {}
+        clearTimeout(retryTimer)
+        retryTimer = Number.isFinite(nextDueAt)
+          ? setTimeout(runActionScan, Math.max(0, nextDueAt - Date.now()))
+          : null
       } catch (err) {
         logger.error('runActionScan: processInbox failed', err)
       }

@@ -166,6 +166,41 @@ describe('processInbox', () => {
     expect(pearpassVaultClient.vaultsRemove).not.toHaveBeenCalled()
   })
 
+  it('waits longer after each failure before it retries an entry', async () => {
+    const now = Date.now()
+    inboxScan([
+      entry(`${INBOX_PREFIX}1_a`, {
+        attempts: 2,
+        envelope: { type: 'delete-vault', actor: 'peer-A', id: 'e1' }
+      })
+    ])
+    mockHandlerSpy.mockRejectedValue(new Error('not writable yet'))
+
+    const result = await processInbox()
+
+    const saved = pearpassVaultClient.vaultsAdd.mock.calls[0][1]
+    expect(saved.nextAttemptAt).toBeGreaterThanOrEqual(now + 20_000)
+    expect(result.nextDueAt).toBe(saved.nextAttemptAt)
+  })
+
+  it('leaves an entry alone until its next attempt is due', async () => {
+    const due = Date.now() + 60_000
+    inboxScan([
+      entry(`${INBOX_PREFIX}1_a`, {
+        attempts: 1,
+        nextAttemptAt: due,
+        envelope: { type: 'delete-vault', actor: 'peer-A', id: 'e1' }
+      })
+    ])
+
+    const result = await processInbox()
+
+    expect(mockHandlerSpy).not.toHaveBeenCalled()
+    expect(result.deferred).toBe(1)
+    expect(result.nextDueAt).toBe(due)
+    expect(pearpassVaultClient.vaultsAdd).not.toHaveBeenCalled()
+  })
+
   it('quarantines past the attempt cap', async () => {
     inboxScan([
       entry(`${INBOX_PREFIX}1_a`, {

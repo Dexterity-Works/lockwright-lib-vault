@@ -183,6 +183,9 @@ Active vault:
 - `activeVaultCreateInvite() -> Promise<string>` / `activeVaultDeleteInvite() -> Promise<void>`
 - `pairActiveVault(inviteCode) -> Promise<{ vaultId, encryptionKey }>`
 - `initListener({ vaultId }) -> Promise<void>`
+- `activeVaultRemoveWriter(writerKey) -> Promise<void>`
+- `activeVaultEnsureEpoch({ start }) -> Promise<{ rotated, id?, seq?, members?, reason?, uncovered }>` (rotates the vault key when the roster changed; see lockwright-lib-vault-core's README)
+- `activeVaultGetEpochStatus() -> Promise<{ vaultId, epoch, seq, legacy, canRead, revoked, members, uncovered }>`
 
 Master vault:
 - `vaultsInit({ encryptionKey, hashedPassword? }) -> Promise<void>` / `vaultsClose() -> Promise<void>`
@@ -214,8 +217,16 @@ EventEmitter surface (Node `events` convention):
 - `'master-update'` - master vault changed (other process). Triggers `runActionScan` automatically.
 - `'personal-swarm-envelope'` payload `{ envelope: string }` (hex of the wrapper). The lib decodes/verifies envelopes and routes them to `ACTIONS` handlers via the inbox.
 - `'personal-swarm-error'` payload `{ reason, message }` - the personal swarm failed to init (e.g. on resume). The device is effectively offline for direct delivery until reinitialised.
+- `'epoch-status'` payload: the active vault's epoch status (as `activeVaultGetEpochStatus`), pushed when it changes. A status with `revoked: true` becomes one `'vault-access-revoked'` per vault.
 - `'vault-access-revoked'` payload `{ vaultId, actor }` - emitted by the lib for consumer apps to run their local delete via `useVault().deleteVaultLocal`.
 - `'newListener'` (Node EventEmitter convention) - the lib uses this to re-drain the inbox when a `'vault-access-revoked'` listener attaches after boot.
+
+### Revoking a device
+
+- `kickDevice({ vaultId, targetDeviceId })` removes the device's writer and roster rows, then rotates the vault key. It returns `{ results, failures, epoch }`: `epoch` is the rotation result, and a failure with `kind: 'epoch'` (`EPOCH_FAILURE_KIND`) means the key did not rotate. In a vault with no epoch yet it starts one first, while the device is still a member, and throws without removing anything if that fails. It stops, with a failure, if another vault became active meanwhile.
+- `getVaultKeyState()` returns the active vault's latest epoch, when it was written (`rotatedAt`), and the removed devices it still reaches (`removed`), or null.
+- `waitForKeyRotation({ vaultId, deviceId, timeoutMs, signal })` resolves with that state once the vault's latest key leaves the device out and reaches only roster devices, or with null at the deadline or on abort. Show a revoke as done only after it resolves.
+- `deleteVaultLocal(vaultId)` throws `VaultNotActiveError` for a vault that is neither active nor revoked.
 
 ### Device-local keyspaces
 

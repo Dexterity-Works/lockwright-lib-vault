@@ -1,5 +1,6 @@
 import { pearpassVaultClient } from '../instances'
 import { getMasterPasswordEncryption } from './getMasterPasswordEncryption'
+import { clearRevoked } from '../utils/revocationGuard'
 
 /**
  * @param {{
@@ -38,4 +39,5 @@ export const createUnprotectedVault = async (vault) => {
   await pearpassVaultClient.vaultsAdd(`vault/${vault.id}`, vault)
 
   await pearpassVaultClient.activeVaultAdd(`vault`, vault)
+  clearRevoked(vault.id)
 }

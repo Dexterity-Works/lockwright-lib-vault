@@ -1,4 +1,5 @@
 import { pearpassVaultClient } from '../instances'
+import { clearRevoked } from '../utils/revocationGuard'
 
 /**
  * @param {{
@@ -54,4 +55,5 @@ export const createProtectedVault = async (vault, password) => {
       hashedPassword
     }
   })
+  clearRevoked(vault.id)
 }

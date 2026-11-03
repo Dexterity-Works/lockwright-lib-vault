@@ -15,15 +15,23 @@ import { logger } from '../utils/logger'
  * @param {{
  *   type: string,
  *   payload?: any,
- *   targets?: string[]
+ *   targets?: string[],
+ *   devices?: Array<{ id: string, masterTopic?: string }>
  * }} action - When `targets` is provided, only those device IDs are
  *   addressed (self always excluded). Otherwise every paired peer is.
+ *   `devices` is the roster to address from instead of listDevices(), for a
+ *   caller that has already removed a target's row.
  * @returns {Promise<{
  *   results: Array<{ targetDeviceId: string, channel: 'outbox' }>,
  *   failures: Array<{ targetDeviceId: string, error: Error }>
  * }>}
  */
-export const broadcastAction = async ({ type, payload, targets } = {}) => {
+export const broadcastAction = async ({
+  type,
+  payload,
+  targets,
+  devices: roster
+} = {}) => {
   if (!type) {
     throw new Error('broadcastAction: type is required')
   }
@@ -37,7 +45,7 @@ export const broadcastAction = async ({ type, payload, targets } = {}) => {
     throw new Error('broadcastAction: cannot resolve own device id')
   }
 
-  const devices = (await listDevices()) ?? []
+  const devices = roster ?? (await listDevices()) ?? []
   const targetSet = Array.isArray(targets) ? new Set(targets) : null
   const others = devices.filter(
     (d) =>
