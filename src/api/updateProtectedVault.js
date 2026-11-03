@@ -2,10 +2,10 @@ import { constantTimeHashCompare } from 'lockwright-lib-utils/password-check'
 
 import { pearpassVaultClient } from '../instances'
 import { getMasterPasswordEncryption } from './getMasterPasswordEncryption'
-import { toCatalogVault } from '../utils/toCatalogVault'
 import { updateVaultPassword } from './helpers/updateVaultPassword'
 import { initActiveVaultWithCredentials } from './initActiveVaultWithCredentials'
 import { listVaults } from './listVaults'
+import { toCatalogVault } from '../utils/toCatalogVault'
 
 /**
  * @param {Object} params
