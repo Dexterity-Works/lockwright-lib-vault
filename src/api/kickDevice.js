@@ -18,7 +18,7 @@ const EPOCH_OK_REASONS = ['current', 'pending']
 /**
  * Revoke a peer's access to the currently active vault. Removes the peer
  * from the autobase writer set (protocol-level revocation), drops their
- * device/<id> index entry, and notifies the kicked device via personal
+ * device/<id> index entry, then notifies the kicked device via personal
  * swarm so it can wipe its local copy even after losing replication.
  *
  * @param {{ vaultId: string, targetDeviceId: string }} params
@@ -36,8 +36,8 @@ export const kickDevice = async ({ vaultId, targetDeviceId } = {}) => {
     throw new Error('kickDevice: targetDeviceId is required')
   }
 
-  // Every step below acts on whatever vault is active: refuse before the
-  // envelope goes out, so a failure here means nothing was sent.
+  // Every step below acts on whatever vault is active: refuse before
+  // touching the target, so a failure here means nothing was sent.
   if ((await getCurrentVault())?.id !== vaultId) {
     throw new Error('kickDevice: the vault is not the active vault')
   }
@@ -61,12 +61,46 @@ export const kickDevice = async ({ vaultId, targetDeviceId } = {}) => {
   // 0. Start a legacy vault's epoch while the target is still a member.
   await startLegacyEpoch('kickDevice')
 
-  // 1. Send the envelope first, while the target's device record (and its
-  //    masterTopic) is still in the local view. broadcastAction looks up
-  //    the target's masterTopic via listDevices(), so after the autobase
-  //    removals below the lookup would miss and no envelope would ship.
-  //    On failure surface it as a partial-delivery so the autobase ops
-  //    below still happen; the target then learns via autobase replication.
+  // 1. Drop the writer at the protocol level so subsequent appends from the
+  //    kicked peer are rejected, and drop every app-layer index entry for
+  //    the same peer (same writerKey or masterTopic). A stranded row keeps
+  //    appearing in the paired-devices list and keeps the kicked device
+  //    sealable for the epoch. Tolerate legacy entries that pre-date the
+  //    writerKey field by skipping with a warning. If the removal fails
+  //    (e.g. we ourselves were kicked mid-operation), no envelope goes out:
+  //    it would tell a device that is still a member to wipe.
+  try {
+    if (!target.writerKey) {
+      logger.error(
+        'kickDevice: target has no writerKey; skipping removeWriter',
+        { targetDeviceId }
+      )
+    }
+
+    // Every step acts on whatever vault is active; another UI may have
+    // switched it while the legacy epoch started.
+    if ((await getCurrentVault())?.id !== vaultId) {
+      throw new Error('kickDevice: the vault is no longer the active vault')
+    }
+
+    await sweepDeviceRows({ primary: target, devices, myWriterKey, vaultId })
+  } catch (error) {
+    logger.error('kickDevice: autobase removal failed; no envelope sent', {
+      err: error?.message ?? String(error)
+    })
+    return {
+      results: [],
+      failures: [{ targetDeviceId, error }],
+      epoch: null
+    }
+  }
+
+  // 2. Send the envelope only after the removal is appended, so the target
+  //    cannot use it as a cue to write before its writer is dropped. The
+  //    removal took the target's row (and its masterTopic) out of the
+  //    view, so the envelope is addressed from the roster read above. On
+  //    failure surface it as a partial-delivery failure; the target then
+  //    learns via autobase replication.
   let broadcastResult
   try {
     broadcastResult = await broadcastAction({
@@ -76,7 +110,8 @@ export const kickDevice = async ({ vaultId, targetDeviceId } = {}) => {
         targetDeviceId,
         targetWriterKey: target.writerKey ?? null
       },
-      targets: [targetDeviceId]
+      targets: [targetDeviceId],
+      devices
     })
   } catch (error) {
     logger.error(
@@ -89,43 +124,7 @@ export const kickDevice = async ({ vaultId, targetDeviceId } = {}) => {
     }
   }
 
-  // 2. Drop the writer at the protocol level so subsequent appends from the
-  //    kicked peer are rejected. Tolerate legacy entries that pre-date the
-  //    writerKey field by skipping with a warning. If autobase rejects the
-  //    write (e.g. we ourselves were kicked mid-operation), surface it as
-  //    a partial-delivery failure: the envelope already shipped and the
-  //    target will wipe regardless of whether our local writer can append.
-  try {
-    if (!target.writerKey) {
-      logger.error(
-        'kickDevice: target has no writerKey; skipping removeWriter',
-        { targetDeviceId }
-      )
-    }
-
-    // Every step acts on whatever vault is active; another UI may have
-    // switched it while the envelope went out.
-    if ((await getCurrentVault())?.id !== vaultId) {
-      throw new Error('kickDevice: the vault is no longer the active vault')
-    }
-
-    // 3. Drop every app-layer index entry for the same peer (same writerKey
-    //    or masterTopic). A stranded row keeps appearing in the paired-
-    //    devices list and keeps the kicked device sealable for the epoch.
-    await sweepDeviceRows({ primary: target, devices, myWriterKey, vaultId })
-  } catch (error) {
-    logger.error(
-      'kickDevice: autobase removal failed; envelope already in flight',
-      { err: error?.message ?? String(error) }
-    )
-    return {
-      results: broadcastResult.results,
-      failures: [...broadcastResult.failures, { targetDeviceId, error }],
-      epoch: null
-    }
-  }
-
-  // 4. Rotate the vault key so the kicked device cannot read later writes.
+  // 3. Rotate the vault key so the kicked device cannot read later writes.
   //    A rotation that did not happen is reported, not thrown: the kick
   //    itself already landed.
   const failures = [...broadcastResult.failures]

@@ -90,6 +90,27 @@ describe('broadcastAction', () => {
     expect(pearpassVaultClient.vaultsAdd).toHaveBeenCalledTimes(1)
   })
 
+  it('addresses from a given roster when the target has left the live one', async () => {
+    pearpassVaultClient.activeVaultList.mockResolvedValue([
+      { id: 'AAA', name: 'ios 18.0', writerKey: 'w-aaa' }
+    ])
+
+    const { results } = await broadcastAction({
+      type: 'delete-vault',
+      payload: { reason: 'kick' },
+      targets: ['BBB'],
+      devices: [
+        { id: 'AAA', writerKey: 'w-aaa' },
+        { id: 'BBB', writerKey: 'w-bbb', masterTopic: 'topic-b' }
+      ]
+    })
+
+    expect(results.map((r) => r.targetDeviceId)).toEqual(['BBB'])
+    expect(pearpassVaultClient.vaultsAdd).toHaveBeenCalledTimes(1)
+    const [, record] = pearpassVaultClient.vaultsAdd.mock.calls[0]
+    expect(record.targetTopic).toBe('topic-b')
+  })
+
   it('ignores targets that are unknown or self', async () => {
     pearpassVaultClient.activeVaultList.mockResolvedValue([
       { id: 'AAA', name: 'ios 18.0', writerKey: 'w-aaa' },

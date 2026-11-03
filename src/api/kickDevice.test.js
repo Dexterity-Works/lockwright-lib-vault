@@ -79,11 +79,12 @@ describe('kickDevice', () => {
     expect(pearpassVaultClient.activeVaultRemoveWriter).not.toHaveBeenCalled()
   })
 
-  it('broadcasts before removing writer/entry so the envelope still finds the target', async () => {
-    listDevices.mockResolvedValue([
+  it('broadcasts only after removing writer/entry, addressed from the roster read before', async () => {
+    const devices = [
       { id: 'SELF', writerKey: 'w-self' },
-      { id: 'B', writerKey: 'w-b' }
-    ])
+      { id: 'B', writerKey: 'w-b', masterTopic: 'topic-b' }
+    ]
+    listDevices.mockResolvedValue(devices)
 
     const callOrder = []
     broadcastAction.mockImplementation(async () => {
@@ -105,19 +106,18 @@ describe('kickDevice', () => {
     expect(pearpassVaultClient.activeVaultRemove).toHaveBeenCalledWith(
       'device/B'
     )
-    expect(callOrder).toEqual(['broadcast', 'removeWriter', 'removeEntry'])
+    expect(callOrder).toEqual(['removeWriter', 'removeEntry', 'broadcast'])
     expect(broadcastAction).toHaveBeenCalledWith({
       type: 'kick-device',
       payload: { vaultId: 'v1', targetDeviceId: 'B', targetWriterKey: 'w-b' },
-      targets: ['B']
+      targets: ['B'],
+      devices
     })
   })
 
   it('skips removeWriter when target has no writerKey but still removes entry and broadcasts', async () => {
-    listDevices.mockResolvedValue([
-      { id: 'SELF', writerKey: 'w-self' },
-      { id: 'B' }
-    ])
+    const devices = [{ id: 'SELF', writerKey: 'w-self' }, { id: 'B' }]
+    listDevices.mockResolvedValue(devices)
 
     await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
 
@@ -128,7 +128,8 @@ describe('kickDevice', () => {
     expect(broadcastAction).toHaveBeenCalledWith({
       type: 'kick-device',
       payload: { vaultId: 'v1', targetDeviceId: 'B', targetWriterKey: null },
-      targets: ['B']
+      targets: ['B'],
+      devices
     })
   })
 
@@ -189,7 +190,7 @@ describe('kickDevice', () => {
     expect(pearpassVaultClient.activeVaultRemove).toHaveBeenCalledTimes(2)
   })
 
-  it('treats an autobase removal throw as a partial-delivery failure without throwing', async () => {
+  it('sends no envelope when the autobase removal throws, and reports it without throwing', async () => {
     listDevices.mockResolvedValue([
       { id: 'SELF', writerKey: 'w-self' },
       { id: 'B', writerKey: 'w-b' }
@@ -199,11 +200,14 @@ describe('kickDevice', () => {
 
     const result = await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
 
-    expect(broadcastAction).toHaveBeenCalled()
+    expect(broadcastAction).not.toHaveBeenCalled()
     expect(pearpassVaultClient.activeVaultRemoveWriter).toHaveBeenCalledWith(
       'w-b'
     )
+    expect(pearpassVaultClient.activeVaultEnsureEpoch).not.toHaveBeenCalled()
+    expect(result.results).toEqual([])
     expect(result.failures).toEqual([{ targetDeviceId: 'B', error: boom }])
+    expect(result.epoch).toBeNull()
   })
 
   it('rotates the epoch after the roster rows are gone and returns the result', async () => {
@@ -271,8 +275,8 @@ describe('kickDevice', () => {
 
     expect(callOrder).toEqual([
       'ensureEpoch',
-      'broadcast',
       'removeWriter',
+      'broadcast',
       'ensureEpoch'
     ])
   })
@@ -381,14 +385,17 @@ describe('kickDevice', () => {
       { id: 'SELF', vaultId: 'v1', writerKey: 'w-self' },
       { id: 'B', vaultId: 'v1', writerKey: 'w-b' }
     ])
-    // The other UI switches vaults while the envelope goes out.
-    broadcastAction.mockImplementation(async () => {
-      getCurrentVault.mockResolvedValue({ id: 'v2' })
-      return { results: [], failures: [] }
-    })
+    // The other UI switches vaults while the legacy epoch check runs.
+    pearpassVaultClient.activeVaultGetEpochStatus.mockImplementation(
+      async () => {
+        getCurrentVault.mockResolvedValue({ id: 'v2' })
+        return { vaultId: 'v1', legacy: false }
+      }
+    )
 
     const result = await kickDevice({ vaultId: 'v1', targetDeviceId: 'B' })
 
+    expect(broadcastAction).not.toHaveBeenCalled()
     expect(pearpassVaultClient.activeVaultRemoveWriter).not.toHaveBeenCalled()
     expect(pearpassVaultClient.activeVaultRemove).not.toHaveBeenCalled()
     expect(pearpassVaultClient.activeVaultEnsureEpoch).not.toHaveBeenCalled()
